@@ -34,5 +34,4 @@ understanding in the upcoming lectures or exams.
 When using these materials, keep in mind the [Rutgers University's Principles of Academic Integrity](http://academicintegrity.rutgers.edu/) and the [Rutgers Department of Computer Science's Academic Integrity Policy](https://www.cs.rutgers.edu/academic-integrity/introduction).
 
 **I.E. Don't cheat, and don't expect these notes to carry you
-through the whole semester. (Because you gotta commit to reading
-and understanding them which is a whole lot of effort).**
+through the whole semester. (Because you gotta commit to reading and understanding them which is a whole lot of effort).**
