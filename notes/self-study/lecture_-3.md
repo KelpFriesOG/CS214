@@ -284,19 +284,50 @@ If you want to save your hands the effort:
 
 **Ex: int add(int x, int y) effectively references the target function int add(int alpha, int beta)**
 
-3) If you leave out the return type from the prototype, the implied return type is void.
-
-**Ex: printme(int ) effectively targets the actual method void printme(int num)**
-
 If ya don't believe me, then try out the following example code:
 
+
+
 ```
 
+#include <stdio.h>
 
+int add(int, int);
+
+void foo();
+
+int sub(int a, int b);
+
+int main()
+{
+    int i;
+
+    for (i = 0; i < 10; ++i)
+        foo();
+}
+
+int add(int a, int b){
+    return a + b;
+}
+
+int sub(int alpha, int beta){
+    return alpha - beta;
+}
+
+void foo()
+{
+    int a = 10;
+    static int sa = 10;
+
+    add(a, 5);
+    sub(sa, 5);
+
+    printf("a = %d, sa = %d\n", a, sa);
+}
 
 ```
 
----
+You should run this program only to find out that once again, the static typing allows the value of $sa$ to change between invocations, whereas the value of $a$ does actually change due to the single add() call that occurs in every run of foo() which always sets $sa = 10 + 5$.
 
 ---
 
