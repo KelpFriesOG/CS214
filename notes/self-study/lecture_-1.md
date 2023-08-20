@@ -199,6 +199,8 @@ function, but the values in the pointer you passed (the copied value) can access
 the original object / array outside of the context of the function! That is why
 we pass pointers, for arrays, and for structs.**
 
+Also consider the fact that passing an entire struct requires a lot of memory overhead compared to passing a pointer to the same struct.
+
 ---
 
 
