@@ -168,3 +168,86 @@ passed pointer, we can effectively modify the underlying object by dereferencing
 the pointer.**
 
 ---
+
+## Qualified Types
+
+In C, qualified types are typenames which are preceded by some qualifier!
+
+If you know basic Java think: private, public, static, e.t.c
+
+While C does not have access modifying qualifiers, it has two major
+other qualifiers: *const* and *volatile*.
+
+- The book kind of ignores the utility of the volatile modifier so
+  I will do the same to focus on the more important modifier for now.
+
+Some examples:
+
+```
+const int x = 1;
+const float f = 3.14;
+```
+
+What makes this all the more confusing is that pointers can have these
+qualifiers too.
+
+Here is a completely ripped example from the book:
+
+```
+
+int i;                  /* i is an ordinary int */
+const int ci = 1;       /* ci is a constant int */
+int *pi;                /* pi is a pointer to an int */
+const int *pci;         /* pci is a pointer to a constant int */
+      
+      /* and now the more complicated stuff */
+
+/* cpi is a constant pointer to an int */
+int *const cpi = &i;
+
+/* cpci is a constant pointer to an constant int */
+const int *const cpci = &ci;
+
+```
+
+- A const variable cannot be modified (in this case *ci* cannot be modified after
+it is initialized). 
+
+- A pointer to an integer has pretty staightforward behavior as well.
+
+- The last two declarations (cpi and cpci) are BOTH constant pointers,
+  in both cases the value of the pointer cannot be changed after initialization.
+
+- But what if the underlying value, in this case either an int or a const int,
+  can be changed but the pointer cannot be changed?
+
+What is the difference between these two lines:
+
+```
+
+const int *pci;
+
+const int *const cpci = &ci;
+
+```
+
+**The statement for pci is NOT declaring a constant pointer! It is declaring
+a regular int pointer for some constant int.**
+
+**The statement for cpci is declaring and initializing a constant pointer for a constant int!**
+
+Syntax be damned, this is simply something you'll have to look out for!
+
+---
+
+## Pointer Arithmetic
+
+WIP
+
+---
+
+## Void pointers and Breaking Rules
+
+WIP
+
+---
