@@ -6,9 +6,9 @@ default: all
 
 all: Hello
 
-Hello: hello.c
-	$(CC) $(CFLAGS) -o hello.o hello.c
+Hello: main.c
+	$(CC) $(CFLAGS) -o main.o main.c
 
 clean:
 	@echo "Cleaning up..."
-	rm -f Hello
+	rm main.o

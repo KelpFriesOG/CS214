@@ -1,0 +1,55 @@
+Suppose you are given an input string:
+
+"some1 helpme I'm_going+++insane"
+
+The goal is to extract the individual words,
+or tokens, from the string.
+
+We do this by splitting the string and considering
+ANY non-alphabetic characters to be separators.
+
+This would mean the two following strings
+have the same number of tokens:
+
+"thing stuff otherstuff blarp"
+
+"thing1stuff3otherstuff,blarp"
+
+The easy part is identifying each token
+but there are three challenges here:
+
+1) How do we inspect a string of unknown
+length without falling off the end?
+
+To solve this we should recall that each
+string, when stored in memory, ends
+with an implicit null terminator ('\0').
+
+2) How do we save an unknown number of tokens
+, which each may vary in size,
+in a data structure? (This data structure cannot
+have a fixed size because we have no idea
+as to how how many tokens we will end up
+having to store).
+
+To solve this, think of using data structures
+that utilize pointers or take advantage
+of directly interfacing with the computer'same
+memory. In other words this structure should
+incorporate dynamic memory allocation!
+
+3) How to sort through an unknown number of tokens
+each of which have an unknown length.
+
+To solve this, we know that if we terminate
+each token with a null terminator we can
+at some point stop the comparison by checking
+for it (to see if have reached the end of the
+token). Furthermore, even though we have no
+idea of how big the data structure is, we
+could end the struture itself with a null token!
+
+An alternative again is to somehow take advantage
+of the system memory to avert having to create
+a memory structure explicitly.
+

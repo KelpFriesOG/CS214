@@ -1,6 +1,7 @@
 #include <stdio.h>
-int main(void)
+
+int main()
 {
-   printf ("Hello from your first program!\n");
-   return 0;
+
+	printf("Hello World\n");
 }

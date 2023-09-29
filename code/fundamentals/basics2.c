@@ -11,6 +11,7 @@ void foo()
     printf("a = %d, sa = %d\n", a, sa);
 }
 
+
 int main()
 {
     int i;
