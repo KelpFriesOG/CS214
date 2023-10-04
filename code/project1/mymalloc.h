@@ -1,5 +1,8 @@
 #include <stdio.h>
 
+#define malloc(x) mymalloc(x, __FILE__, __LINE__)
+#define free(x) myfree(x, __FILE__, __LINE__)
+
 typedef struct // Always occupies 8 bytes total.
 {
 
@@ -21,8 +24,8 @@ typedef struct // Always occupies 8 bytes total.
 // malloc takes in an unsigned int
 // (0 or positive int)
 // that tells it how many bytes to allocate
-void *malloc(unsigned);
+void *mymalloc(unsigned, char *, int);
 
 // free will take in a pointer created by malloc
 // and free the memory associated with it!
-void free(void *);
+void myfree(void *, char *, int);
