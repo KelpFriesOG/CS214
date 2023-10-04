@@ -1,0 +1,37 @@
+So this is basically a run down of expectations!
+
+For this assignment we are trying to create our own custom implementations
+of malloc() and free().
+
+As a recap, we use malloc to allocate space on the heap.
+We want to allocate space on the heap because it the space
+we allocate their is more versatile and the stuff we store
+stays there after the program ends!
+
+We use free to take a given pointer and "free" the memory
+it points to. This DOES NOT remove or add memory to our
+program, nor does it reset any bytes.
+
+Instead the memory is untouched, but now is marked as
+free. This means that C understands that the memory
+is no longer special or reserved and it may choose to
+overwrite that memory space at any given time!
+
+Lets create the project files
+
+After doing that, read the project pdf and put in the
+bare minimum requirements.
+
+As suggested by the project instructions,
+the best approach here is to store "chunks"
+in the memory array. Each chunk will be
+an object which contains some key data!
+
+Every chunk will have a:
+
+-> Size
+-> A pointer to the next chunk
+-> and a boolean (in this case an int) indicating
+if the chunk is free or not!
+
+Lets make this chunk!
