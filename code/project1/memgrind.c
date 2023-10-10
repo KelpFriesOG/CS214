@@ -11,11 +11,11 @@
 int main(int argc, char **argv)
 {
 
-    void *init_ptr = malloc(10);
+    void *init_ptr = malloc(4072);
 
-    void *split_1 = malloc(16);
+    // void *split_1 = malloc(16);
 
-    free(split_1);
+    // free(split_1);
 
     free(init_ptr);
 }

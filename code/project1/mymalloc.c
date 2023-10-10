@@ -35,11 +35,16 @@ int points_to_memory(void *ptr)
 void *mymalloc(unsigned len, char *file, int line)
 {
 
-    /* If the user puts in a number greater than
-    504, then wen cannot fit the metadata AND the
-    space the user requested regardless of the state
-    of the array.*/
-    if (len == 0 || len > 504)
+    /* 
+    The array can hold 512*8 bytes. If
+    all bytes are to be held, then the most
+    bytes that the user can request is (512*8)-8,
+    because there must be at least a single piece
+    of metadata (which occupies 8 bytes) associated
+    with that largest piece of memory.
+    */
+
+    if (len == 0 || len > 4096-8)
     {
         return NULL;
     }
@@ -75,9 +80,33 @@ void *mymalloc(unsigned len, char *file, int line)
     if (is_empty)
     {
         header occupied = {1, len};
-        header free = {0, 512 - (len + 16)};
         memcpy(memory, &occupied, 8);
-        memcpy((char *)(memory + 1) + len, &free, 8);
+
+        /* If the user specified a length greater than
+        4080 bytes that would mean we don't have enough
+        meaningful space for another chunk (which is 16
+        bytes total minimum).
+        
+        So if the user specified a length exactly equal
+        to 4080, then I make a piece of metadata (which is free),
+        which says that 0 free bytes are available.
+
+        If the user specifed a multiple of 8 less than 4080,
+        then we get the minimum meaningful chunk of data (8 byte MD + 8 byte data).
+        This minimum meaningful chunk will be properly placed at the
+        END OF THE ARRAY AND ADDRESS A NON-ZERO MULTIPLE OF 8
+        OF AMOUNT OF FREE DATA.
+
+        */
+
+        if(len <= 4080){
+            header free = {0, 4096 - (len + 16)};
+            memcpy((char *)(memory + 1) + len, &free, 8);
+        }
+
+        // Regardless of how much memory was given over,
+        // we always return a pointer to the FIRST DATA byte
+        // after the 8 byte metadata.
         return memory + 1;
     }
 
