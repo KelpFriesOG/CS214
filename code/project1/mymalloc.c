@@ -1,6 +1,5 @@
-#include "mymalloc.h"
-#include <stdio.h>
 #include <string.h>
+#include "mymalloc.h"
 
 // Requirements based on 1.3
 #define MEMLENGTH 512
@@ -24,6 +23,7 @@ if the pointer points to some address in memory array,
 and returns 0 otherwise.*/
 int points_to_memory(void *ptr)
 {
+    // Linear traversal of the heap to check if pointer matches.
     for (int i = 0; i < 512; ++i)
         if (ptr == &memory[i])
             return i + 1;
@@ -35,7 +35,7 @@ int points_to_memory(void *ptr)
 void *mymalloc(unsigned len, char *file, int line)
 {
 
-    /* 
+    /*
     The array can hold 512*8 bytes. If
     all bytes are to be held, then the most
     bytes that the user can request is (512*8)-8,
@@ -44,7 +44,7 @@ void *mymalloc(unsigned len, char *file, int line)
     with that largest piece of memory.
     */
 
-    if (len == 0 || len > 4096-8)
+    if (len == 0 || len > 4096 - 8)
     {
         return NULL;
     }
@@ -86,7 +86,7 @@ void *mymalloc(unsigned len, char *file, int line)
         4080 bytes that would mean we don't have enough
         meaningful space for another chunk (which is 16
         bytes total minimum).
-        
+
         So if the user specified a length exactly equal
         to 4080, then I make a piece of metadata (which is free),
         which says that 0 free bytes are available.
@@ -99,7 +99,8 @@ void *mymalloc(unsigned len, char *file, int line)
 
         */
 
-        if(len <= 4080){
+        if (len <= 4080)
+        {
             header free = {0, 4096 - (len + 16)};
             memcpy((char *)(memory + 1) + len, &free, 8);
         }
@@ -135,6 +136,8 @@ void *mymalloc(unsigned len, char *file, int line)
 }
 
 // NOTE: free will deallocate memory from the storage array: memory
+// UNFIXED CASE: User passes in a pointer that is not a pointer to the
+// first piece of data associated with some metadata.
 void myfree(void *ptr, char *file, int line)
 {
     int in_memory = points_to_memory(ptr);

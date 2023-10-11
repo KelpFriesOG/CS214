@@ -1,9 +1,6 @@
 #include <stdio.h>
 #include "mymalloc.c"
 
-#define malloc(x) mymalloc(x, __FILE__, __LINE__)
-#define free(x) myfree(x, __FILE__, __LINE__)
-
 #ifndef TESTCASE
 #define TESTCASE 0
 #endif
