@@ -59,10 +59,13 @@ int main(int argc, char **argv)
                 void *ptr = malloc(1);
 
                 int i = 0;
-                while (ptr_array[i] != NULL && i < 120)
+                
+                while (ptr_array[i] == NULL && i < 120)
                 {
-                    ptr_array[i] = ptr;
+                    i++;
                 }
+
+                ptr_array[i] = ptr;
 
                 n_allocations++;
             }

@@ -6,7 +6,7 @@ typedef struct // Always occupies 8 bytes total.
 
     int is_occupied; // occupies 4 bytes I think.
     int size;        // occupies 4 bytes I think.
-
+    
 } header;
 
 // typedef struct chunk // At least occupies 16 bytes
