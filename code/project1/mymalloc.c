@@ -20,13 +20,45 @@ static double memory[MEMLENGTH];
 
 /*Returns a positive number (1 more the index where the match was found)
 if the pointer points to some address in memory array,
-and returns 0 otherwise.*/
+and returns 0 otherwise.
+
+If the pointer does not point to the start of a payload then
+we need to throw an error.
+
+*/
 int points_to_memory(void *ptr)
 {
     // Linear traversal of the heap to check if pointer matches.
+    // header* current = memory;
     for (int i = 0; i < 512; ++i)
         if (ptr == &memory[i])
             return i + 1;
+
+    return 0;
+}
+
+/* This function checks if the pointer is at the start of a chunk
+by checking if the pointer points to the byte that comes right
+after any of the headers.*/
+int at_start_of_chunk(void *ptr)
+{
+
+    header *current = memory;
+
+    for (int i = 0; i < 512; i++)
+    {
+        int size = (current)->size;
+        if (current + 1 == ptr)
+        {
+            return i + 8;
+        }
+        else
+        {
+            current = (header *)((char *)(current + 1) + size);
+            i += 8;
+            i += size;
+        }
+    }
 
     return 0;
 }
@@ -59,6 +91,10 @@ void *mymalloc(unsigned len, char *file, int line)
     // WIP
     // Checking to see if the array is empty.
     // There may be edge cases where this fails.
+
+    // The easier way to check would be to simply check if the first chunk
+    // 's metadata is marked as free.
+
     int is_empty = 1;
     for (int i = 0; i < 512; i++)
     {
@@ -141,8 +177,16 @@ void *mymalloc(unsigned len, char *file, int line)
 void myfree(void *ptr, char *file, int line)
 {
     int in_memory = points_to_memory(ptr);
-    if (!in_memory)
+    int at_start = at_start_of_chunk(ptr);
+
+    if (!in_memory || !at_start)
     {
+        if(!in_memory){
+            printf("Error, passed pointer not in memory: %s:%d\n", file, line);
+        } else {
+            printf("Error, passed pointer not at start of chunk: %s:%d\n", file, line);
+        }
+
         return;
     }
     else

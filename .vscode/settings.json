@@ -4,5 +4,6 @@
     "stdlib.h": "c",
     "stdio.h": "c"
   },
-  "C_Cpp.default.compilerPath": "C:\\MinGW\\bin\\g++.exe"
+  "C_Cpp.default.compilerPath": "C:\\MinGW\\bin\\g++.exe",
+  "C_Cpp.intelliSenseEngineFallback": "enabled"
 }
