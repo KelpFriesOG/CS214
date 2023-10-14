@@ -19,7 +19,7 @@ void coalesce()
         return;
     }
 
-    int n_byte = 0;
+    int begin_here = 0;
 
     // 80 actual, 56 expected for n byte
     /*
@@ -31,21 +31,24 @@ void coalesce()
     free(ptr2);
 
     */
-    while (n_byte + current->size < 4096)
+
+    // + HEADER_SIZE + current->size
+
+    HEADER *next = (HEADER *)((char *)current + HEADER_SIZE + current->size);
+
+    while ((char *)memory + begin_here + current->size != &memory[511] && (char *)memory + begin_here + current->size != &memory[510])
     {
+        next = (HEADER *)((char *)current + HEADER_SIZE + current->size);
 
-        HEADER *next = (HEADER *)((char *)current + HEADER_SIZE + current->size);
-
-        if (current->is_occupied == 0 && next->is_occupied == 0)
+        if (next->is_occupied == 0 && current->is_occupied == 0)
         {
             // The line below is KEY, and works as intended.
-            current->size = current->size + 8 + next->size;
-            next = (char *)current + HEADER_SIZE + current->size;
-            n_byte += HEADER_SIZE + next->size;
+            current->size = next->size + 8 + current->size;
+            next = (HEADER *)((char *)current + HEADER_SIZE + current->size);
             continue;
         }
 
-        n_byte += HEADER_SIZE + next->size;
+        begin_here += HEADER_SIZE + current->size;
         current = next;
     }
 }
@@ -123,7 +126,7 @@ void *my_malloc(size_t size, int line, char *file)
         int old_size = next->size;
         next->size = size;
 
-        if (old_size - (8 + size) >= 16)
+        if (old_size - (8 + size) >= 8)
         {
             ((HEADER *)((char *)(next + 1) + size))->size = old_size - (8 + size);
             ((HEADER *)((char *)(next + 1) + size))->is_occupied = 0;
