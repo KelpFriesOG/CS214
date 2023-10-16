@@ -4,6 +4,7 @@
 
 #define MEMLENGTH 512
 #define MEMLENGTH_BYTES (MEMLENGTH * sizeof(double))
+// #define HEADER_SIZE sizeof(HEADER)
 #define HEADER_SIZE 8
 #define ROUNDUP(x) (((x) + 7) & ~7)
 
@@ -36,14 +37,14 @@ void coalesce()
 
     HEADER *next = (HEADER *)((char *)current + HEADER_SIZE + current->size);
 
-    while ((char *)memory + begin_here + current->size != &memory[511] && (char *)memory + begin_here + current->size != &memory[510])
+    while ((char *)memory + begin_here + current->size != (char *)&memory[511] && (char *)memory + begin_here + current->size != (char *)&memory[510])
     {
         next = (HEADER *)((char *)current + HEADER_SIZE + current->size);
 
         if (next->is_occupied == 0 && current->is_occupied == 0)
         {
             // The line below is KEY, and works as intended.
-            current->size = next->size + 8 + current->size;
+            current->size = next->size + HEADER_SIZE + current->size;
             next = (HEADER *)((char *)current + HEADER_SIZE + current->size);
             continue;
         }
@@ -53,7 +54,7 @@ void coalesce()
     }
 }
 
-void *my_malloc(size_t size, int line, char *file)
+void *my_malloc(int size, int line, char *file)
 {
 
     // BASE CASE: Cannot allocate 0 bytes
@@ -65,7 +66,7 @@ void *my_malloc(size_t size, int line, char *file)
     size = ROUNDUP(size);
 
     // First ensure that the size given by the user is valid
-    if (size > (MEMLENGTH * 8) - 8)
+    if (size > (MEMLENGTH * 8) - HEADER_SIZE)
     {
         return NULL;
     }
@@ -82,11 +83,12 @@ void *my_malloc(size_t size, int line, char *file)
         // If so, then put another header there.
         if (size < MEMLENGTH_BYTES - 2 * HEADER_SIZE)
         {
-            HEADER *next = (char *)new + HEADER_SIZE + size;
+            HEADER *next = (HEADER *)((char *)new + HEADER_SIZE + size);
             next->size = MEMLENGTH_BYTES - 2 * HEADER_SIZE - size;
             next->is_occupied = 0;
         }
 
+        printf("success \n");
         return memory + 1;
     }
 
@@ -95,8 +97,67 @@ void *my_malloc(size_t size, int line, char *file)
     // and repeat until we find a header that is not
     // already occupied and has enough space for the
     // requested size.
+
+    /*
+
+
+
+    */
+
     else
     {
+        HEADER *current = (HEADER *)memory;
+
+        /*
+
+        Need to check if the next header becomes the very end of the list
+        or if it becomes a next header
+
+
+        */
+        HEADER *next;
+        if (current->size != MEMLENGTH_BYTES - HEADER_SIZE)
+        {
+            HEADER *next = (HEADER *)((char *)current + HEADER_SIZE + current->size);
+        }
+        else
+        {
+            HEADER *next = (HEADER *)((char *)current + HEADER_SIZE);
+        }
+        int current_byte = 0;
+        void *data_ptr = (void *)(current);
+
+        // We traverse the array header by header.
+        // We run this loop at least once, because
+        // the array is guaranteed to have at least one header.
+        do
+        {
+
+            data_ptr = (void *)((char *)current + HEADER_SIZE);
+
+            // 16 represents minimum space after data for header + free
+            if (current->is_occupied == 0 && current->size - 16 >= size)
+            {
+                int sizeDiff = current->size - HEADER_SIZE - size;
+                current->size = size;
+                current->is_occupied = 1;
+                next = (HEADER *)((char *)current + HEADER_SIZE + current->size);
+                next->size = sizeDiff;
+                next->is_occupied = 0;
+                printf("success");
+                return (char *)current + HEADER_SIZE;
+            }
+
+            current_byte += HEADER_SIZE + current->size;
+            current = (HEADER *)((char *)current + HEADER_SIZE + current->size);
+
+        } while (current_byte < MEMLENGTH_BYTES && (void *)current < (void *)memory + MEMLENGTH_BYTES);
+
+        printf("ERROR: Not having enough space \n ORIGIN: at line %d in file %s", __LINE__, __FILE__);
+
+        return NULL;
+
+        /*
         HEADER *head = (HEADER *)memory;
         HEADER *next = (char *)head + HEADER_SIZE + head->size;
         int n_byte = HEADER_SIZE + head->size;
@@ -126,15 +187,18 @@ void *my_malloc(size_t size, int line, char *file)
         int old_size = next->size;
         next->size = size;
 
-        if (old_size - (8 + size) >= 8)
+        if (old_size - (HEADER_SIZE + size) >= HEADER_SIZE)
         {
-            ((HEADER *)((char *)(next + 1) + size))->size = old_size - (8 + size);
+            ((HEADER *)((char *)(next + 1) + size))->size = old_size - (HEADER_SIZE + size);
             ((HEADER *)((char *)(next + 1) + size))->is_occupied = 0;
         }
 
         next->is_occupied = 1;
 
+        printf("success \n");
         return next + 1;
+
+        */
     }
 }
 
@@ -158,7 +222,6 @@ Otherwise it will print casewise error messages prior to
 terminating.
 
 */
-
 void my_free(void *ptr, int line, char *file)
 {
 
@@ -168,16 +231,19 @@ void my_free(void *ptr, int line, char *file)
     {
         // TODO: Print error message regarding the memory not being initialized.
         // WIP: Untested.
-        print("ERROR: free() cannot be called before memory is initialized \n ORIGIN: at line %d in file %s", __LINE__, __FILE__);
+        printf("ERROR: free() cannot be called before memory is initialized \n ORIGIN: at line %d in file %s", __LINE__, __FILE__);
         return;
     }
 
     // First we check if the pointer is somewhere valid in the array.
     int in_array = 0;
 
+    char *holder;
+
     for (int i = 0; i < MEMLENGTH_BYTES; i++)
     {
-        if ((char *)(memory) + i == ptr)
+        holder = (char *)(memory) + i;
+        if (holder == ptr)
         {
             in_array = 1;
             break;
@@ -199,8 +265,44 @@ void my_free(void *ptr, int line, char *file)
     // be in the array but also must be pointing
     // to the middle of a chunk.
 
+    /*
+        // Adjusting ptr to point to its header
+        HEADER *ptr_header = (HEADER *)((char *)ptr - HEADER_SIZE);
+
+        // Now we go through the array looking for the chunk that the pointer points to.
+        HEADER *current = (HEADER *)memory;
+        void *data_ptr;  // pointer to the current data segment
+
+        // We traverse the array header by header.
+        while ((void *)current < (void *)memory + MEMLENGTH_BYTES)
+        {
+            data_ptr = (void *)((char *)current + HEADER_SIZE);  // data segment starts after the header
+
+            // Check if we've found the correct memory block.
+            if (data_ptr == ptr)
+            {
+                if (current->is_occupied == 0)
+                {
+                    printf("ERROR: Pointer was already freed \n ORIGIN: at line %d in file %s", line, file);
+                    coalesce();
+                    return;
+                }
+
+                // Valid pointer found, free the memory block
+                current->is_occupied = 0;
+                coalesce();
+                printf("success");
+                return;
+            }
+
+            // Moving to the next block in the memory array
+            current = (HEADER *)((char *)current + HEADER_SIZE + current->size);
+        }
+    */
+
     HEADER *current = (HEADER *)memory;
     int current_byte = 0;
+    void *data_ptr = (void *)(current);
 
     // We traverse the array header by header.
     // We run this loop at least once, because
@@ -208,7 +310,7 @@ void my_free(void *ptr, int line, char *file)
     do
     {
 
-        void *data_ptr = (void *)(current + 1);
+        data_ptr = (void *)((char *)current + HEADER_SIZE);
 
         if (current->is_occupied == 0 && data_ptr == ptr)
         {
@@ -225,13 +327,14 @@ void my_free(void *ptr, int line, char *file)
             // process of calling free(), simply free().
             current->is_occupied = 0;
             coalesce();
+            printf("success \n");
             return;
         }
 
         current_byte += HEADER_SIZE + current->size;
         current = (HEADER *)((char *)current + HEADER_SIZE + current->size);
 
-    } while (current_byte < MEMLENGTH);
+    } while (current_byte < MEMLENGTH_BYTES && (void *)current < (void *)memory + MEMLENGTH_BYTES);
 
     // If we reach this point, we print the appropriate error message,
     // should be regarding the fact that the pointer DOES exist in
@@ -242,3 +345,16 @@ void my_free(void *ptr, int line, char *file)
 }
 
 /* WIP: Function to make sure all bytes are free.*/
+
+int memory_is_empty()
+{
+
+    if (((HEADER *)memory)->size = 0)
+    {
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
+}
