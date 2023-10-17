@@ -1,5 +1,5 @@
 CC      = gcc
-CFLAGS  = -g -fsanitize=address,undefined -Wall
+CFLAGS  = -g -fsanitize=address,undefined -Werror
 RM      = rm -f
 
 default: all
