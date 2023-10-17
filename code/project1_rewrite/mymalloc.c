@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "mymalloc.h"
 
@@ -21,19 +22,6 @@ void coalesce()
     }
 
     int begin_here = 0;
-
-    // 80 actual, 56 expected for n byte
-    /*
-    int *ptr = malloc(10);
-    double *ptr2 = malloc(20);
-    int *ptr3 = malloc(4024);
-    free(ptr);
-    free(ptr3);
-    free(ptr2);
-
-    */
-
-    // + HEADER_SIZE + current->size
 
     HEADER *next = (HEADER *)((char *)current + HEADER_SIZE + current->size);
 
@@ -88,7 +76,6 @@ void *my_malloc(int size, int line, char *file)
             next->is_occupied = 0;
         }
 
-        printf("success \n");
         return memory + 1;
     }
 
@@ -97,12 +84,6 @@ void *my_malloc(int size, int line, char *file)
     // and repeat until we find a header that is not
     // already occupied and has enough space for the
     // requested size.
-
-    /*
-
-
-
-    */
 
     else
     {
@@ -144,7 +125,6 @@ void *my_malloc(int size, int line, char *file)
                 next = (HEADER *)((char *)current + HEADER_SIZE + current->size);
                 next->size = sizeDiff;
                 next->is_occupied = 0;
-                printf("success");
                 return (char *)current + HEADER_SIZE;
             }
 
@@ -156,49 +136,6 @@ void *my_malloc(int size, int line, char *file)
         printf("ERROR: Not having enough space \n ORIGIN: at line %d in file %s", __LINE__, __FILE__);
 
         return NULL;
-
-        /*
-        HEADER *head = (HEADER *)memory;
-        HEADER *next = (char *)head + HEADER_SIZE + head->size;
-        int n_byte = HEADER_SIZE + head->size;
-
-        while (next->is_occupied == 1 || next->size < size)
-        {
-
-            n_byte += HEADER_SIZE + next->size;
-
-            if (n_byte >= MEMLENGTH_BYTES)
-            {
-
-                // TODO: Print error message regarding not having enough space.
-                // WIP: Only tested on when first header occupies ENTIRE ARRAY.
-                printf("ERROR: Not having enough space \n ORIGIN: at line %d in file %s", __LINE__, __FILE__);
-                return NULL;
-            }
-
-            next = (char *)next + HEADER_SIZE + next->size;
-        }
-
-        // If we find a header that is free and has
-        // enough empty space. We then check if it
-        // could have enough additional space to create
-        // a meaningful free chunk after our alloted data.
-
-        int old_size = next->size;
-        next->size = size;
-
-        if (old_size - (HEADER_SIZE + size) >= HEADER_SIZE)
-        {
-            ((HEADER *)((char *)(next + 1) + size))->size = old_size - (HEADER_SIZE + size);
-            ((HEADER *)((char *)(next + 1) + size))->is_occupied = 0;
-        }
-
-        next->is_occupied = 1;
-
-        printf("success \n");
-        return next + 1;
-
-        */
     }
 }
 
@@ -265,41 +202,6 @@ void my_free(void *ptr, int line, char *file)
     // be in the array but also must be pointing
     // to the middle of a chunk.
 
-    /*
-        // Adjusting ptr to point to its header
-        HEADER *ptr_header = (HEADER *)((char *)ptr - HEADER_SIZE);
-
-        // Now we go through the array looking for the chunk that the pointer points to.
-        HEADER *current = (HEADER *)memory;
-        void *data_ptr;  // pointer to the current data segment
-
-        // We traverse the array header by header.
-        while ((void *)current < (void *)memory + MEMLENGTH_BYTES)
-        {
-            data_ptr = (void *)((char *)current + HEADER_SIZE);  // data segment starts after the header
-
-            // Check if we've found the correct memory block.
-            if (data_ptr == ptr)
-            {
-                if (current->is_occupied == 0)
-                {
-                    printf("ERROR: Pointer was already freed \n ORIGIN: at line %d in file %s", line, file);
-                    coalesce();
-                    return;
-                }
-
-                // Valid pointer found, free the memory block
-                current->is_occupied = 0;
-                coalesce();
-                printf("success");
-                return;
-            }
-
-            // Moving to the next block in the memory array
-            current = (HEADER *)((char *)current + HEADER_SIZE + current->size);
-        }
-    */
-
     HEADER *current = (HEADER *)memory;
     int current_byte = 0;
     void *data_ptr = (void *)(current);
@@ -327,7 +229,6 @@ void my_free(void *ptr, int line, char *file)
             // process of calling free(), simply free().
             current->is_occupied = 0;
             coalesce();
-            printf("success \n");
             return;
         }
 
@@ -349,10 +250,20 @@ void my_free(void *ptr, int line, char *file)
 int memory_is_empty()
 {
 
-    if (((HEADER *)memory)->size = 0)
+    // If the first header points to a fully coalesced block of memory
+    if (((HEADER *)memory)->is_occupied == 0 && ((HEADER *)memory)->size == 4088)
     {
         return 1;
     }
+
+    // Else if the first header has a size of 0 (indicating unitialized memory)
+    // BY DEFINITION: UNINITIALIZED MEMORY IS CONSIDERED EMPTY
+    else if (((HEADER *)memory)->size == 0)
+    {
+        return 1;
+    }
+
+    // Otherwise memory must be partially occupied
     else
     {
         return 0;
