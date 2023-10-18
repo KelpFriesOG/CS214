@@ -100,7 +100,7 @@ void *my_malloc(int size, int line, char *file)
             return result;
         }
 
-        printf("ERROR: Not having enough space \n ORIGIN: at line %d in file %s", __LINE__, __FILE__);
+        printf("ERROR: Not having enough space \n From line %d in file %s", line, file);
         return NULL;
     }
 }
@@ -189,7 +189,7 @@ void my_free(void *ptr, int line, char *file)
     {
         // TODO: Print error message regarding the memory not being initialized.
         // WIP: Untested.
-        printf("ERROR: free() cannot be called before memory is initialized \n ORIGIN: at line %d in file %s", __LINE__, __FILE__);
+        printf("ERROR: free() cannot be called before memory is initialized \n From line %d in file %s", line, file);
         return;
     }
 
@@ -208,7 +208,7 @@ void my_free(void *ptr, int line, char *file)
     // and terminate the function.
     if (in_array == 0)
     {
-        printf("ERROR: Pointer is outside the memory \n ORIGIN: at line %d in file %s", __LINE__, __FILE__);
+        printf("ERROR: Pointer is outside the memory \n From line %d in file %s", line, file);
         return;
     }
 
@@ -226,7 +226,7 @@ void my_free(void *ptr, int line, char *file)
     // If we reach this point, we print the appropriate error message,
     // should be regarding the fact that the pointer DOES exist in
     // memory but does not point to the the beginning of a memory segment.
-    printf("ERROR: Pointer does not point to the beginning of a memory segment \n ORIGIN: at line %d in file %s", __LINE__, __FILE__);
+    printf("ERROR: Pointer does not point to the beginning of a memory segment \n From line %d in file %s", line, file);
     return;
 }
 
@@ -251,7 +251,7 @@ int free_valid_pointer(void *ptr, int line, char *file)
         if (current->is_occupied == 0 && data_ptr == ptr)
         {
             // TODO: Print error message regarding the pointer being freed already.
-            printf("ERROR: Pointer is already freed \n ORIGIN: at line %d in file %s", __LINE__, __FILE__);
+            printf("ERROR: Pointer is already freed \n From line %d in file %s", line, file);
             coalesce();
             return 0;
         }
