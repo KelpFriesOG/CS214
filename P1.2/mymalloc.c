@@ -13,12 +13,9 @@ static double memory[MEMLENGTH];
 void * initialized_memory_add(int size, int line, char *file, HEADER *current);
 int free_valid_pointer(void *ptr, int line, char *file);
 
-/**
- * Replication of malloc functions
+/**Replication of malloc functions
  * @Kalpesh Chavan, Hieu Nguyen
 */
-
-
 
 /** Coalesces adjacent free blocks of memory into a singular larger block
  * 
@@ -26,7 +23,7 @@ int free_valid_pointer(void *ptr, int line, char *file);
 void coalesce(){
     HEADER *current = (HEADER *)memory;
 
-    if (current->size >= 4088){
+    if (current->size >= MEMLENGTH_BYTES - HEADER_SIZE){
         return;
     }
 
@@ -34,7 +31,7 @@ void coalesce(){
 
     HEADER *next = (HEADER *)((char *)current + HEADER_SIZE + current->size);
 
-    while ((char *)memory + begin_here + current->size != (char *)&memory[511] && (char *)memory + begin_here + current->size != (char *)&memory[510]){
+    while ((char *)memory + begin_here + current->size != (char *)&memory[MEMLENGTH - 1] && (char *)memory + begin_here + current->size != (char *)&memory[MEMLENGTH - 2]){
         next = (HEADER *)((char *)current + HEADER_SIZE + current->size);
 
         if (next->is_occupied == 0 && current->is_occupied == 0){
@@ -50,8 +47,6 @@ void coalesce(){
 }
 
 
-
-
 /**inserts data blocks & headers into memory given enough space
  * 
 */
@@ -64,7 +59,7 @@ void *my_malloc(int size, int line, char *file){
     size = ROUNDUP(size);
 
     // First ensure that the size given by the user is valid
-    if (size > (MEMLENGTH * 8) - HEADER_SIZE){
+    if (size > (MEMLENGTH_BYTES) - HEADER_SIZE){
         return NULL;
     }
 
@@ -76,8 +71,7 @@ void *my_malloc(int size, int line, char *file){
         // Then check if the memory is at least large enough to fit
         // another header with the minimum size of 8.
         // If so, then put another header there.
-        if (size < MEMLENGTH_BYTES - 2 * HEADER_SIZE)
-        {
+        if (size < MEMLENGTH_BYTES - 2 * HEADER_SIZE){
             HEADER *next = (HEADER *)((char *)new + HEADER_SIZE + size);
             next->size = MEMLENGTH_BYTES - 2 * HEADER_SIZE - size;
             next->is_occupied = 0;
@@ -105,7 +99,7 @@ void *my_malloc(int size, int line, char *file){
  *
 */
 void * initialized_memory_add(int size, int line, char *file, HEADER *current){
-    
+    int min_space = 16;
     HEADER *return_header;
     HEADER *next;
     if (current->size != MEMLENGTH_BYTES - HEADER_SIZE){
@@ -123,9 +117,9 @@ void * initialized_memory_add(int size, int line, char *file, HEADER *current){
     do{
 
         data_ptr = (void *)((char *)current + HEADER_SIZE);
-
+        
         // 16 represents minimum space after data for header + free
-        if (current->is_occupied == 0 && current->size - 16 >= size){
+        if (current->is_occupied == 0 && current->size - min_space >= size){
             int sizeDiff = current->size - HEADER_SIZE - size;
             current->size = size;
             current->is_occupied = 1;
@@ -142,12 +136,6 @@ void * initialized_memory_add(int size, int line, char *file, HEADER *current){
     } while (current_byte < MEMLENGTH_BYTES && (void *)current < (void *)memory + MEMLENGTH_BYTES);
     return NULL;
 }
-
-
-/*
-
-
-*/
 
 /**frees specific pointer in memory given pointer
  * 
@@ -257,7 +245,6 @@ int free_valid_pointer(void *ptr, int line, char *file){
 
 }
 
-/* WIP: Function to make sure all bytes are free.*/
 
 
 /**checks that entirety of memory is empty
