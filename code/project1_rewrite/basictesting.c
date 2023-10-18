@@ -1,36 +1,92 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "mymalloc.c"
+#include <sys/time.h>
 
 void test1();
 void test2();
 void test3();
 void test4();
+void test5();
+struct timeval start_time, end_time;
 
+/**testing functions for mymalloc.c
+ * @Kalpesh Chavan, Hieu Nguyen
+ */
+
+/**starts function testing
+ *
+ */
 int main(int argc, char *argv[])
 {
-    //     int *ptr = malloc(10);
-    //     double *ptr2 = malloc(20);
-    //     int *ptr3 = malloc(4016);
-    //     printf("SIZE OF HEADER %d,\n", sizeof(HEADER));
-    //     free(ptr);
-    //     free(ptr3);
-    //     free(ptr2);
-    //     printf("TESTING");
 
-    test1();
-    printf("test1 complete");
+    double total_time;
 
-    test2();
-    printf("test2 complete");
+    for (int i = 0; i < 50; i++)
+    {
+        gettimeofday(&start_time, NULL);
+        test1();
+        gettimeofday(&end_time, NULL);
+        double time_taken = (end_time.tv_sec - start_time.tv_sec) * 1000000.0 + (end_time.tv_usec - start_time.tv_usec);
+        printf("time take for run (in microseconds): %f \n", time_taken);
+        total_time += time_taken;
+    }
 
-    test3();
-    printf("test3 complete");
+    printf("test1 complete, avereage time (in microseconds): %f \n", (total_time / 50));
+    total_time = 0;
 
-    test4();
-    printf("test4 complete");
+    for (int i = 0; i < 50; i++)
+    {
+        gettimeofday(&start_time, NULL);
+        test2();
+        gettimeofday(&end_time, NULL);
+        double time_taken = (end_time.tv_sec - start_time.tv_sec) * 1000000.0 + (end_time.tv_usec - start_time.tv_usec);
+        printf("time take for run (in microseconds): %f \n", time_taken);
+        total_time += time_taken;
+    }
+    printf("test2 complete, avereage time (in microseconds): %f \n", (total_time / 50));
+    total_time = 0;
+
+    for (int i = 0; i < 50; i++)
+    {
+        gettimeofday(&start_time, NULL);
+        test3();
+        gettimeofday(&end_time, NULL);
+        double time_taken = (end_time.tv_sec - start_time.tv_sec) * 1000000.0 + (end_time.tv_usec - start_time.tv_usec);
+        printf("time take for run (in microseconds): %f \n", time_taken);
+        total_time += time_taken;
+    }
+    printf("test3 complete, avereage time (in microseconds): %f \n", (total_time / 50));
+    total_time = 0;
+
+    for (int i = 0; i < 50; i++)
+    {
+        gettimeofday(&start_time, NULL);
+        test4();
+        gettimeofday(&end_time, NULL);
+        double time_taken = (end_time.tv_sec - start_time.tv_sec) * 1000000.0 + (end_time.tv_usec - start_time.tv_usec);
+        printf("time take for run (in microseconds): %f \n", time_taken);
+        total_time += time_taken;
+    }
+    printf("test4 complete, avereage time (in microseconds): %f \n", (total_time / 50));
+    total_time = 0;
+
+    for (int i = 0; i < 50; i++)
+    {
+        gettimeofday(&start_time, NULL);
+        test5();
+        gettimeofday(&end_time, NULL);
+        double time_taken = (end_time.tv_sec - start_time.tv_sec) * 1000000.0 + (end_time.tv_usec - start_time.tv_usec);
+        printf("time take for run (in microseconds): %f \n", time_taken);
+        total_time += time_taken;
+    }
+    printf("test5 complete, avereage time (in microseconds): %f \n", (total_time / 50));
+    total_time = 0;
 }
 
+/**mallocs a pointer and immediately frees it 120 times
+ *
+ */
 void test1()
 {
     for (int i = 0; i < 120; i++)
@@ -38,9 +94,12 @@ void test1()
         char *ptr = malloc(1); // Allocate 1 byte of memory
         free(ptr);             // Release the memory
     }
-    // printf("MemClear?: %d\n", memCleared());  // Check if memory is cleared
+    // printf("MemClear?: %d\n", memory_is_empty());  // Check if memory is cleared
 }
 
+/**mallocs 120 blocks and then frees all of them
+ *
+ */
 void test2()
 {
     char *ptrArray[120]; // Array to store 120 pointers
@@ -55,9 +114,12 @@ void test2()
         free(ptrArray[i]); // Release the memory
     }
 
-    // printf("MemClear?: %d\n", memCleared());  // Check if memory is cleared
+    // printf("MemClear?: %d\n", memory_is_empty());  // Check if memory is cleared
 }
 
+/**makes array of 120 pointers, randomly allocates or frees pointers until 120 are allocated
+ *
+ */
 void test3()
 {
     char *ptrArray[120];      // Array to store 120 pointers
@@ -81,10 +143,11 @@ void test3()
             // printf("free loc=%d\n", loc);
             free(ptrArray[loc]);
             allocated[loc] = 0;
+            i -= 2;
         }
     }
 
-    printf("Process is done.\n");
+    // printf("Process is done.\n");
 
     // Clean up any unreleased memory
     for (int i = 0; i < 120; i++)
@@ -95,11 +158,12 @@ void test3()
         }
     }
 
-    // printf("MemClear?: %d\n", memCleared());  // Check if memory is cleared
+    // printf("MemClear?: %d\n", memory_is_empty());  // Check if memory is cleared
 }
 
-// creates a pattern of 8 bytes of occupied data followed by free space of 8 bytes.
-// free the data from left to right, forcing 2 sided coalesce for every free
+/**creates a pattern of data and free blocks, then frees data to constantly coalesce frees
+ *
+ */
 void test4()
 {
 
@@ -122,8 +186,37 @@ void test4()
     {
         free(list[i]);
     }
+    // printf("MemClear?: %d\n", memory_is_empty());  // Check if memory is cleared
 }
 
+/* allocates a sequence of randomly sized (from 8 to 128 bytes sized) pointers
+ * and then frees them once malloc fails. (FAILURE IS INTENTIONAL once per run)
+ */
 void test5()
 {
+
+    int size = rand() % 121 + 8;
+    char *ptr = (char *)malloc(size);
+    // create an array of pointers to hold the created pointers
+    char *ptrs[256];
+    memset(ptrs, '\0', sizeof(ptrs));
+    int i = 0;
+
+    do
+    {
+        ptrs[i] = ptr;
+        i++;
+        size = rand() % 128 + 8;
+        ptr = (char *)malloc(size);
+
+    } while (ptr != NULL);
+
+    // Freeing up all the pointers in the ptr array
+    for (int i = 0; i < 256; i++)
+    {
+        if (ptrs[i] != NULL)
+        {
+            free(ptrs[i]);
+        }
+    }
 }
