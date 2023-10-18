@@ -132,6 +132,12 @@ void *initialized_memory_add(int size, int line, char *file, HEADER *current)
 
         data_ptr = (void *)((char *)current + HEADER_SIZE);
 
+        if (current->is_occupied == 0 && current->size == size)
+        {
+            current->is_occupied = 1;
+            return current + 1;
+        }
+
         // 16 represents minimum space after data for header + free
         if (current->is_occupied == 0 && current->size - min_space >= size)
         {
