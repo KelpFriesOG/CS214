@@ -1,0 +1,8 @@
+This a sample of data that should come up to some small number of bytes within the system.
+As a computer scientist it is incredibly important that this code runs as intended.
+The next step would be for the program to run and read this code.
+
+The other programs will go about taking command line arguments for the filename and
+other values which will be used to compute the final output of the program. 
+
+At least that is the hope.

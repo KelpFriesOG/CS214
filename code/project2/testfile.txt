@@ -1,0 +1,4 @@
+This a file which contains a few basic words.
+The4numbers between words should count as separators.
+But the dashes-between words should make two words
+count as one. For fuk's sake please work.
