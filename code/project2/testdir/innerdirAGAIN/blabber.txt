@@ -1,0 +1,6 @@
+EDGE8''hi
+DO''newlines
+
+count'''-'''as--their-own-WORD?
+HELLO WORLD
+CASES
