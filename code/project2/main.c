@@ -24,7 +24,8 @@ typedef struct Dictionary
 
 int is_letter(char c)
 {
-    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+    // Letters include letters and apostrophe
+    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c == '\'');
 }
 
 void process_file(const char *filePath, DICT *dict)
