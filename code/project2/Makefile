@@ -1,6 +1,7 @@
 CC = gcc
-CFLAGS = -Wall
-TARGET = main
+# Flags include address and undefined sanitizer
+CFLAGS = -Wall -Werror -fsanitize=address,undefined
+TARGET = words
 
 $(TARGET): *.c
 	$(CC) $(CFLAGS) -o $@ $^
@@ -11,4 +12,4 @@ clean:
 
 .PHONY: run
 run: $(TARGET)
-	./$(TARGET) <directory_path>
+	./$(TARGET) testdir

@@ -38,6 +38,12 @@ typedef struct Dictionary
     int size;
 } DICT;
 
+/* Prototypes for used functions */
+int is_letter(char c);
+void print_dict(DICT *dict);
+void make_unique_frequencies(DICT *dict, int unique_freq[]);
+void add_word(DICT *dict, char *word);
+
 /**checks if given char is a valid letter or symbol
  *
  * checks if c is an A to Z letter, upper and lower case
@@ -89,7 +95,6 @@ void process_file(const char *filePath, DICT *dict)
     ssize_t bytesRead;
     char word[BUFSIZE];
     int wordIndex = 0;
-    char prevChar = '\0';
 
     while ((bytesRead = read(fd, buffer, BUFSIZE)) > 0)
     {
@@ -109,8 +114,6 @@ void process_file(const char *filePath, DICT *dict)
                 add_word(dict, word);
                 wordIndex = 0;
             }
-
-            prevChar = buffer[i];
         }
 
         // Deal with and add any leftover word inside the word array
@@ -281,7 +284,7 @@ void print_dict(DICT *dict)
  * Uses a DFS system to find all directories and logs the text files
  *
  * @param *path takes the initial path directory
- * @param *words starts the entire dictionary
+ * @param *words sta=rts the entire dictionary
  * @return void
  */
 void traverse(const char *path, DICT *words)
@@ -341,6 +344,18 @@ void init_dict(DICT *dict)
     dict->head = NULL;
 }
 
+void free_dict(DICT *dict)
+{
+    WORD *current = dict->head;
+    while (current != NULL)
+    {
+        WORD *next = current->next;
+        free(current->word);
+        free(current);
+        current = next;
+    }
+}
+
 int main(int argc, char *argv[])
 {
 
@@ -352,6 +367,10 @@ int main(int argc, char *argv[])
     traverse(path, words);
 
     print_dict(words);
+
+    free_dict(words);
+
+    free(words);
 
     return 0;
 }
