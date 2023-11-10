@@ -359,7 +359,19 @@ void free_dict(DICT *dict)
 int main(int argc, char *argv[])
 {
 
-    const char *path = "testdir"; // argv[1];
+    const char *path;
+
+    // Pickup path from second argument
+    // Else return usage message
+    if (argc == 2)
+    {
+        path = argv[1];
+    }
+    else
+    {
+        printf("Usage: %s <path>\n", argv[0]);
+        return 1;
+    }
 
     DICT *words = (DICT *)malloc(sizeof(DICT));
     init_dict(words);
