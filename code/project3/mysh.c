@@ -86,6 +86,7 @@ JOB *process_line(char *line)
     return (JOB *)args;
 }
 
+/* BETTER Function that processes a line and returns a list of jobs to execute*/
 JOB *process_line2(char *line)
 {
 
@@ -186,6 +187,7 @@ int is_builtin(char *command)
         // If we find a matching command return 1
         if (strcmp(command, builtin_commands[i]) == 0)
         {
+
             return 1;
         }
     }
@@ -282,14 +284,14 @@ int main(int argc, char **argv)
             // Get user input
             getline(&lineptr, &n, stdin);
 
+            // Remove trailing newline using simple logic
+            if (lineptr[strlen(lineptr) - 1] == '\n')
+            {
+                lineptr[strlen(lineptr) - 1] = '\0';
+            }
+
             // Break line into tokens where each job has its associated files.
             JOB *job = process_line2(lineptr);
-
-            // Check if user wants to exit
-            if (strcmp(lineptr, "exit") == 0)
-            {
-                break;
-            }
 
             // Otherwise execute check if the command is builtin
             // If not try executing the command as a non-built in command.
