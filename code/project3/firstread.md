@@ -118,7 +118,13 @@ TREATED AS NORMAL ARGUMENTS.**
 
 ### Conditionals
 
-WIP
+then ...
+
+Only execute ... if the previous program exited successfully.
+
+else ...
+
+Execute ... if the previous program exited not normally.
 
 ---
 
@@ -130,3 +136,51 @@ WIP
 ## Q & A
 
 1) What if the file contains the exit command and then a few other commands after? When does batch mode stop reading?
+
+2) General structure of what we need to tackle?
+
+Major components:
+
+- Command line parser (includes wildcard expansion)
+
+Program launcher
+    - create child process
+    - change stdin/stdout in child
+    - gather exit status from child
+
+**REMINDER regarding execv()**
+
+Type signature:
+
+```
+execv(char *path, char **args);
+```
+
+**Last argument SHOULD ALWAYS BE NULL**
+
+3) What function should I use for the built in cd and pwd functions?
+
+- use the getcwd() function for pwd
+- use the chdir() function for cd
+
+4) Should I use execvp or execv?
+
+- I (the professor) wants us to use execv.
+
+5) Is there some sort of reccomended structure?
+
+tokenizer (could just be the main method):
+- repeatedly calls read to get input text
+- breaks inputs into tokens.
+- creates a job order describing the process to launch.
+- job order includes argument list, input redirect, output redirect, and path to executable.
+
+note: you will need one of these per process to launch.
+- a pipeline will have at least two.
+
+program launcher:
+- create child process
+- change stdin/stdout in child
+- gather exit status from child
+
+

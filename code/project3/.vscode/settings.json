@@ -1,0 +1,6 @@
+{
+    "r.lsp.promptToInstall": false,
+    "files.associations": {
+        "types.h": "c"
+    }
+}
