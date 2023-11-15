@@ -107,6 +107,8 @@ void process_file(const char *filePath, DICT *dict)
             else if (wordIndex > 0 && buffer[i] == '-' && i < bytesRead - 1 && is_letter(buffer[i + 1]) == 1)
             {
                 word[wordIndex++] = buffer[i];
+                // butter-fly
+                // butter-----fly
             }
             else if (wordIndex > 0)
             {
@@ -129,6 +131,9 @@ void process_file(const char *filePath, DICT *dict)
     {
         word[wordIndex] = '\0';
     }
+
+    
+
     close(fd);
 }
 
