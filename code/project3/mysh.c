@@ -42,52 +42,8 @@ void execute_command(JOB *job)
     return;
 }
 
-/* Function that processes a line and returns a list of jobs to execute*/
-JOB *process_line(char *line)
-{
-    // Tokenize the line into a list of arguments
-    // If a character is <, >, or |, treat it as its own argument
-    char *token = strtok(line, " \t\n");
-    char *args[MAX_TOKENS];
-    int i = 0;
-
-    while (token != NULL && i < MAX_TOKENS)
-    {
-        // If the current character is <, >, or | add the single character
-        // to the list of tokens
-        if (strcmp(token, "<") == 0 || strcmp(token, ">") == 0 || strcmp(token, "|") == 0)
-        {
-            args[i] = token;
-            i++;
-            continue;
-        }
-
-        args[i] = token;
-        token = strtok(NULL, " \t\n <  >  | ");
-        i++;
-    }
-
-    args[i] = NULL;
-
-    // print the tokens we found (upto the last NULL)
-    if (DEBUG)
-    {
-        for (i = 0; i < MAX_TOKENS; i++)
-        {
-            if (args[i] == NULL)
-            {
-                printf("NULL\n");
-                break;
-            }
-            printf("%s\n", args[i]);
-        }
-    }
-
-    return (JOB *)args;
-}
-
-/* BETTER Function that processes a line and returns a list of jobs to execute*/
-JOB *process_line2(char *line)
+/* BETTER Function that processes a line and returns a pointer to the tokens*/
+char **process_line(char *line)
 {
 
     // READ THROUGH LINE CHARACTER BY CHARACTER
@@ -165,35 +121,7 @@ JOB *process_line2(char *line)
         }
     }
 
-    // Free the memory allocated for the string list and batches
-    for (i = 0; i < length; i++)
-    {
-        free(stringList[i]);
-    }
-
-    free(stringList);
-
-    return 0;
-}
-
-/* Function to check if the provided command is valid */
-int is_builtin(char *command)
-{
-    int i;
-
-    // Iterating through built in commands
-    for (i = 0; i < sizeof(builtin_commands) / sizeof(builtin_commands[0]); i++)
-    {
-        // If we find a matching command return 1
-        if (strcmp(command, builtin_commands[i]) == 0)
-        {
-
-            return 1;
-        }
-    }
-
-    // Else return 0
-    return 0;
+    return stringList;
 }
 
 /* Built in command: cd*/
@@ -209,6 +137,8 @@ void builtin_cd(char **args)
         {
             perror("mysh");
         }
+        // Print current working directory
+        printf("%s\n", getcwd(NULL, 0));
     }
     return;
 }
@@ -231,16 +161,22 @@ void builtin_pwd(char **args)
 /* Built in command: which*/
 void builtin_which(char **args)
 {
-    int i;
-    for (i = 0; i < sizeof(builtin_commands) / sizeof(builtin_commands[0]); i++)
+    // Check the actual bin directory to ensure the command exists
+    // use a child process to execute the which command
+    pid_t pid;
+    int status;
+    if ((pid = fork()) == 0)
     {
-        if (strcmp(args[1], builtin_commands[i]) == 0)
+        if (execvp("which", args) == -1)
         {
-            printf("%s\n", builtin_commands[i]);
-            return;
+            perror("mysh");
         }
+        exit(EXIT_FAILURE);
     }
-    printf("mysh: %s: command not found\n", args[1]);
+    else
+    {
+        waitpid(pid, &status, 0);
+    }
     return;
 }
 
@@ -248,6 +184,48 @@ void builtin_which(char **args)
 void builtin_exit(char **args)
 {
     exit(0);
+}
+
+/* Function to check if the provided command is valid
+, if it is valid, execute the associated command and return 1, else return 0*/
+int is_builtin(char **line)
+{
+    int i;
+
+    // Extract first token as the comman
+    char *command = line[0];
+
+    // Iterating through built in commands
+    for (i = 0; i < sizeof(builtin_commands) / sizeof(builtin_commands[0]); i++)
+    {
+        // If we find a matching command return 1
+        if (strcmp(command, builtin_commands[i]) == 0)
+        {
+
+            // Execute the command via a switch case based on the
+            // current value of i.
+            switch (i)
+            {
+            case 0:
+                builtin_cd(line);
+                break;
+            case 1:
+                builtin_pwd(line);
+                break;
+            case 2:
+                builtin_which(line);
+                break;
+            case 3:
+                builtin_exit(line);
+                break;
+            }
+
+            return 1;
+        }
+    }
+
+    // Else return 0
+    return 0;
 }
 
 // Main function
@@ -290,37 +268,20 @@ int main(int argc, char **argv)
                 lineptr[strlen(lineptr) - 1] = '\0';
             }
 
-            // Break line into tokens where each job has its associated files.
-            JOB *job = process_line2(lineptr);
+            // Break line into tokens
+            char **tokens = process_line(lineptr);
 
-            // Otherwise execute check if the command is builtin
-            // If not try executing the command as a non-built in command.
-            if (is_builtin(lineptr))
+            // If the command is a built in command,
+            // execute it and move on.
+            if (is_builtin(tokens))
             {
-                char *args[2];
-                args[0] = lineptr;
-                args[1] = NULL;
-                if (strcmp(lineptr, "cd") == 0)
-                {
-                    builtin_cd(args);
-                }
-                else if (strcmp(lineptr, "pwd") == 0)
-                {
-                    builtin_pwd(args);
-                }
-                else if (strcmp(lineptr, "which") == 0)
-                {
-                    builtin_which(args);
-                }
-                else if (strcmp(lineptr, "exit") == 0)
-                {
-                    builtin_exit(args);
-                }
+                continue;
             }
             else
             {
-                // Execute command
-                execute_command(lineptr);
+                // Create jobs from the tokens
+
+                // Execute each job sequentially
             }
 
         } while (1);
