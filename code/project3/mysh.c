@@ -9,13 +9,16 @@
 #define IS_INTERACTIVE (argc == 1)
 #define IS_BATCH (argc == 2)
 #define MAX_TOKENS 1024
-#define DEBUG 0
+#define DEBUG 1
+
+// which ls > some_file
+// pwd > tmp
 
 // Function Prototypes
 void execute_command(JOB *job);
-void dispatch_jobs(char **tokens);
+void *dispatch_jobs(char **tokens);
 char **process_line(char *line);
-void find_glob(char *path, char *pattern);
+char **find_glob(char *path, char *pattern);
 void builtin_cd(char **args);
 void builtin_pwd(char **args);
 void builtin_which(char **args);
@@ -75,43 +78,7 @@ void *dispatch_jobs(char **tokens)
             char **glob = find_glob(".", *current_tkn);
         }
 
-        // If the token is ">" ensure it is surrounded by valid file names.
-        else if (*current_tkn == '>')
-        {
-            // Check to ensure that you can read from the previous token
-            // and write to the next token (where the file names are the tokens)
-            if (prev_tkn == NULL || next_tkn == NULL)
-            {
-                printf("mysh: syntax error \n");
-                return NULL;
-            }
-
-            // Check if previous file exists and can be read from
-            if (access(prev_tkn, R_OK) == -1)
-            {
-                printf("mysh: %s: No such file or directory\n", prev_tkn);
-                return NULL;
-            }
-
-            // Check if next file exists and can be written to
-            if (access(next_tkn, W_OK) == -1)
-            {
-                printf("mysh: %s: No such file or directory\n", next_tkn);
-                return NULL;
-            }
-
-            // Create a job that writes the contents from
-            // the previous token (file) to the next token (file)
-            JOB *job = malloc(sizeof(JOB));
-            job->command = *current_tkn;
-            job->arguments = NULL;
-            job->input = prev_tkn;
-            job->output = next_tkn;
-            job->exec_path = NULL;
-
-            // Execute the job
-            execute_command(job);
-        }
+        // TODO: Deal with redirection and piping tokens "<, >, |"
 
         // Otherwise simply check if the given token is a file that exists
         // within the current working directory
@@ -446,18 +413,17 @@ int main(int argc, char **argv)
             }
 
             // Break line into tokens
+
             char **tokens = process_line(lineptr);
 
             // If the command is a built in command,
             // execute it and move on.
-            if (is_builtin(tokens))
+            if (tokens != NULL && is_builtin(tokens))
             {
                 continue;
             }
             else
             {
-                // Dispatch the jobs
-                dispatch_jobs(tokens);
             }
 
         } while (1);
