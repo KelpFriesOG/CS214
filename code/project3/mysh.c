@@ -9,19 +9,30 @@
 #define IS_INTERACTIVE (argc == 1)
 #define IS_BATCH (argc == 2)
 #define MAX_TOKENS 1024
-#define DEBUG 1
+#define DEBUG 0
+
+// Function Prototypes
+void execute_command(JOB *job);
+void dispatch_jobs(char **tokens);
+char **process_line(char *line);
+void find_glob(char *path, char *pattern);
+void builtin_cd(char **args);
+void builtin_pwd(char **args);
+void builtin_which(char **args);
+void builtin_exit(char **args);
+int is_builtin(char **line);
 
 // List of built-in commands
 char *builtin_commands[] = {"cd", "pwd", "which", "exit"};
 
-/* Function to execute non-builtin commands via execvp*/
+/* Function to execute non-builtin commands via execv*/
 void execute_command(JOB *job)
 {
     pid_t pid;
     int status;
     if ((pid = fork()) == 0)
     {
-        if (execvp(job->command, job->arguments) == -1)
+        if (execv(job->command, job->arguments) == -1)
         {
             perror("mysh");
         }
@@ -40,6 +51,91 @@ void execute_command(JOB *job)
     }
 
     return;
+}
+
+/* Takes in a token list and returns a list of jobs
+if each section of the list is a valid job*/
+void *dispatch_jobs(char **tokens)
+{
+
+    // Setting up a pointer to iterate through the tokens.
+    char *next_tkn = tokens + 1;
+    char *current_tkn = tokens;
+    char *prev_tkn = NULL;
+
+    // Using a while loop to continue iterating until current token is NULL
+    while (*current_tkn != NULL)
+    {
+
+        // If the token is contains a wildcard "*" then expand it to
+        // all the files it refers to within the current directory
+        if (strchr(*current_tkn, '*') != NULL)
+        {
+            // Find the glob pattern, and create a job for each associated file
+            char **glob = find_glob(".", *current_tkn);
+        }
+
+        // If the token is ">" ensure it is surrounded by valid file names.
+        else if (*current_tkn == '>')
+        {
+            // Check to ensure that you can read from the previous token
+            // and write to the next token (where the file names are the tokens)
+            if (prev_tkn == NULL || next_tkn == NULL)
+            {
+                printf("mysh: syntax error \n");
+                return NULL;
+            }
+
+            // Check if previous file exists and can be read from
+            if (access(prev_tkn, R_OK) == -1)
+            {
+                printf("mysh: %s: No such file or directory\n", prev_tkn);
+                return NULL;
+            }
+
+            // Check if next file exists and can be written to
+            if (access(next_tkn, W_OK) == -1)
+            {
+                printf("mysh: %s: No such file or directory\n", next_tkn);
+                return NULL;
+            }
+
+            // Create a job that writes the contents from
+            // the previous token (file) to the next token (file)
+            JOB *job = malloc(sizeof(JOB));
+            job->command = *current_tkn;
+            job->arguments = NULL;
+            job->input = prev_tkn;
+            job->output = next_tkn;
+            job->exec_path = NULL;
+
+            // Execute the job
+            execute_command(job);
+        }
+
+        // Otherwise simply check if the given token is a file that exists
+        // within the current working directory
+        else
+        {
+            if (access(*current_tkn, F_OK) == -1)
+            {
+                printf("mysh: %s: No such file or directory\n", *current_tkn);
+            }
+        }
+
+        // If in DEBUG mode, print the token
+        if (DEBUG)
+        {
+            printf("%s\n", *current_tkn);
+        }
+
+        // Iterating the tokens
+        prev_tkn = current_tkn;
+        current_tkn = next_tkn;
+        next_tkn = next_tkn + 1;
+    }
+
+    return NULL;
 }
 
 /* BETTER Function that processes a line and returns a pointer to the tokens*/
@@ -106,6 +202,11 @@ char **process_line(char *line)
         end = i + 1;
     }
 
+    // Insert a NULL at the end of the list
+    stringList = (char **)realloc(stringList, (length + 1) * sizeof(char *));
+    stringList[length] = NULL;
+    length++;
+
     // IF DEBUG, Print the strings in the list
     if (DEBUG)
     {
@@ -122,6 +223,82 @@ char **process_line(char *line)
     }
 
     return stringList;
+}
+
+/* Function to find matches to a glob pattern (which contains a SINGLE wildcard)*/
+char **find_glob(char *path, char *pattern)
+{
+    // Pattern matching (w/o using glob function)
+    // Create child process that calls find with the given path
+    // and glob pattern (using execv)
+
+    // Then we pipe the result of the command to be returned from this function
+
+    // Create a child process
+    pid_t pid;
+    int status;
+
+    if ((pid = fork()) == 0)
+    {
+        // Create a pipe
+        int pipefd[2];
+        if (pipe(pipefd) == -1)
+        {
+            perror("mysh");
+            exit(EXIT_FAILURE);
+        }
+
+        // Create the child process
+        // execv("find", (char *const[]){"find", path, "-name", pattern, NULL}) == -1
+        if (execl("/usr/bin/find", "find", path, "-name", pattern, NULL) == -1)
+        {
+            perror("COULD NOT FIND FILE: mysh");
+            exit(EXIT_FAILURE);
+        }
+
+        // Close the write end of the pipe
+        close(pipefd[1]);
+
+        // Read the output from the child process
+        char buffer[1024];
+        char **output = NULL;
+        int i = 0;
+
+        while (read(pipefd[0], buffer, sizeof(buffer)) > 0)
+        {
+            // If DEBUG, print the output
+            if (DEBUG)
+            {
+                printf("%s", buffer);
+            }
+
+            // Add the output to the list
+            output = (char **)realloc(output, (i + 1) * sizeof(char *));
+            output[i] = buffer;
+            i++;
+        }
+
+        // Close the read end of the pipe
+        close(pipefd[0]);
+
+        // Return the outputted list of files
+        return output;
+    }
+    else
+    {
+        // Wait for the child process to finish
+        waitpid(pid, &status, 0);
+
+        if (WIFEXITED(status))
+        {
+            if (WEXITSTATUS(status) != 0)
+            {
+                perror("mysh");
+            }
+        }
+
+        return NULL;
+    }
 }
 
 /* Built in command: cd*/
@@ -279,26 +456,12 @@ int main(int argc, char **argv)
             }
             else
             {
-                // Create jobs from the tokens
-
-                // Execute each job sequentially
+                // Dispatch the jobs
+                dispatch_jobs(tokens);
             }
 
         } while (1);
     }
-
-    // Prompt to print
-    // char *prompt = "mysh> ";
-
-    // printf("%s", prompt);
-
-    // char *lineptr;
-    // size_t n = 0;
-
-    // getline(&lineptr, &n, stdin);
-    // printf("%s\n", lineptr);
-
-    // free(lineptr);
 
     return (0);
 }
