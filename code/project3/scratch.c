@@ -22,6 +22,8 @@ void builtin_pwd(char **args);
 void builtin_which(char **args);
 void builtin_exit(char **args);
 int is_builtin(char **line);
+int is_valid_path(char *path);
+void exec_command(char **args);
 
 // List of built-in commands
 char *builtin_commands[] = {"cd", "pwd", "which", "exit"};
@@ -113,15 +115,15 @@ char **process_line(char *line)
     return stringList;
 }
 
-/* A function that creates and executes jobs based on a tokenized list*/
-void *dispatch_jobs(char **tokens)
-{
-}
-
-// A method that creates a child process and executes a command with
-// the given arguments
+/* A function that executes a command based on a tokenized list */
 void exec_command(char **args)
 {
+
+    if (args == NULL)
+    {
+        return;
+    }
+
     // Create a child process
     pid_t pid;
     int status;
@@ -150,6 +152,25 @@ void exec_command(char **args)
         // Wait for the child process to finish
         waitpid(pid, &status, 0);
     }
+
+    // If the command was "echo", revaluate the OUTPUT of the command
+    if (strcmp(args[0], "echo") == 0)
+    {
+
+        // Check if the command after echo is built in, if so evaluate it
+
+        if (args + 1 != NULL)
+        {
+
+            if (is_builtin(args + 1))
+            {
+                return;
+            }
+            exec_command(args + 1);
+        }
+    }
+
+    return;
 }
 
 // Function to check if a string is a valid path
