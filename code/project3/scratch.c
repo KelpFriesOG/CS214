@@ -153,22 +153,22 @@ void exec_command(char **args)
         waitpid(pid, &status, 0);
     }
 
-    // If the command was "echo", revaluate the OUTPUT of the command
-    if (strcmp(args[0], "echo") == 0)
-    {
+    // // If the command was "echo", revaluate the OUTPUT of the command
+    // if (strcmp(args[0], "echo") == 0)
+    // {
 
-        // Check if the command after echo is built in, if so evaluate it
+    //     // Check if the command after echo is built in, if so evaluate it
 
-        if (args + 1 != NULL)
-        {
+    //     if (args + 1 != NULL)
+    //     {
 
-            if (is_builtin(args + 1))
-            {
-                return;
-            }
-            exec_command(args + 1);
-        }
-    }
+    //         if (is_builtin(args + 1))
+    //         {
+    //             return;
+    //         }
+    //         exec_command(args + 1);
+    //     }
+    // }
 
     return;
 }
