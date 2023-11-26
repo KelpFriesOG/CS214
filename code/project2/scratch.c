@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/types.h>
+#include <fcntl.h>
 
 #define IS_INTERACTIVE (argc == 1)
 #define IS_BATCH (argc == 2)
@@ -123,6 +124,12 @@ int exec_command(char **args)
         return EXIT_FAILURE;
     }
 
+    // Check if the first token is >, <, or |
+    if (strcmp(args[0], ">") == 0 || strcmp(args[0], "<") == 0 || strcmp(args[0], "|") == 0)
+    {
+        return EXIT_FAILURE;
+    }
+
     // Create a child process
     pid_t pid;
     int status;
@@ -131,6 +138,7 @@ int exec_command(char **args)
     {
         printf("Executing command: %s\n", args[0]);
     }
+
     if ((pid = fork()) == 0)
     {
         // Execute the command
@@ -138,127 +146,77 @@ int exec_command(char **args)
         {
             perror("mysh");
             exit(EXIT_FAILURE);
+
+            // If the command is not valid, it must be redirection or piping
+            // In which case check if the command is valid.
+
+            // Return exit status of the command
+            return EXIT_SUCCESS;
+        }
+        else if (pid < 0)
+        {
+            perror("mysh");
+            exit(EXIT_FAILURE);
             return EXIT_FAILURE;
         }
+        else
+        {
+            // Wait for the child process to finish
+            waitpid(pid, &status, 0);
+        }
 
-        // Return exit status of the command
-        return EXIT_SUCCESS;
-    }
-    else if (pid < 0)
-    {
-        perror("mysh");
-        exit(EXIT_FAILURE);
         return EXIT_FAILURE;
     }
-    else
-    {
-        // Wait for the child process to finish
-        waitpid(pid, &status, 0);
-    }
-
-    return EXIT_FAILURE;
 }
 
-/* Function to redirect standard input/output of a program and execute it*/
-int redirect_io(char *program, char **args, int in_or_out)
+int exec_pipeline(char **args, const char *input, const char *output)
 {
-    // If the in_or_out is 0, then we redirect standard input using freopen
-    if (in_or_out == 0)
+
+    pid_t pid = fork();
+
+    if (pid == 0)
     {
-        freopen(program, "r", stdin);
-    }
+        // Child process
 
-    // If the in_or_out is 1, then we redirect standard output using freopen
-    if (in_or_out == 1)
-    {
-        freopen(program, "w", stdout);
-    }
+        // Set up input redirection
+        if (input != NULL)
+        {
+            FILE *inputFile = freopen(input, "r", stdin);
+            if (inputFile == NULL)
+            {
+                perror("freopen");
+                exit(EXIT_FAILURE);
+            }
+        }
 
-    // Execute the program in a child process
-    exec_command(args);
-}
+        // Set up output redirection
+        if (output != NULL)
+        {
+            FILE *outputFile = freopen(output, "w", stdout);
+            if (outputFile == NULL)
+            {
+                perror("freopen");
+                exit(EXIT_FAILURE);
+            }
+        }
 
-/* Function to create a pipeline with two processes */
-int create_pipeline(char **left_args, char **right_args)
-{
-    // Create a pipe
-    int pipefd[2];
+        // Execute the command
+        execv(args[0], args);
 
-    // Sse pipe() to arrange that standard output for the first process will
-    // be written to standard input for the second process.
-    if (pipe(pipefd) == -1)
-    {
-        perror("pipe");
-        exit(EXIT_FAILURE);
-    }
-
-    // Fork the first process
-    pid_t pid1 = fork();
-
-    if (pid1 == -1)
-    {
-        perror("fork");
-        exit(EXIT_FAILURE);
-    }
-
-    // If pid1 is 0, then we are in the first child process
-    if (pid1 == 0)
-    {
-        // We will only be using the write end of the pipe (close the read end)
-        close(pipefd[0]);
-
-        // Anything that goes in std output of the first process
-        // will be redirected to the read end of the pipe
-        dup2(pipefd[1], STDOUT_FILENO);
-
-        // We can techinically close the write end of the pipe here
-        close(pipefd[1]);
-
-        // Execute the first command
-        execv(left_args[0], left_args);
-
-        // If the command fails, print an error and exit
+        // If execvp fails, print an error message
         perror("execvp");
         exit(EXIT_FAILURE);
     }
 
-    // Fork the second process
-    pid_t pid2 = fork();
-
-    if (pid2 == -1)
+    else if (pid < 0)
     {
+        // Forking error
         perror("fork");
         exit(EXIT_FAILURE);
     }
 
-    // If pid2 is 0, then we are in the second child process
-    if (pid2 == 0)
-    {
-        // We will only be using the read end of the pipe
-        close(pipefd[1]);
-
-        // Anything that goes in std input of the second process
-        // will be redirected to the write end of the pipe.
-        dup2(pipefd[0], STDIN_FILENO);
-
-        // We can techinically close the read end of the pipe here.
-        close(pipefd[0]);
-
-        // Execute the second command
-        execv(right_args[0], right_args);
-
-        // If the command fails, print an error and exit
-        perror("execvp");
-        exit(EXIT_FAILURE);
-    }
-
-    // Close both ends of the pipe in the parent
-    close(pipefd[0]);
-    close(pipefd[1]);
-
-    // Wait for both child processes to finish
-    waitpid(pid1, NULL, 0);
-    waitpid(pid2, NULL, 0);
+    // Parent process
+    wait(NULL);
 }
 
 // Function to check if a string is a valid path
@@ -484,53 +442,35 @@ int main(int argc, char **argv)
         // Continue until user types exit
         do
         {
-            // Print prompt
-            printf("%s", prompt);
 
-            // Get user input
-            getline(&lineptr, &n, stdin);
+            // Process input / output redirection + pipelining
+            lineptr = process_line(lineptr);
 
-            // Remove trailing newline using simple logic
-            if (lineptr[strlen(lineptr) - 1] == '\n')
+            // If lineptr is NULL, break
+            if (lineptr == NULL)
             {
-                lineptr[strlen(lineptr) - 1] = '\0';
+                break;
             }
 
-            // Break line into tokens
-            char **tokens = process_line(lineptr);
-
-            // If the command is a built in command,
-            // execute it and move on.
-            if (tokens != NULL && is_builtin(tokens))
+            // Check if the first argument is a valid file
+            if (!is_valid_path(lineptr))
             {
+                fprintf(stderr, "Error: Invalid path: %s\n", lineptr);
                 continue;
             }
 
-            else
+            // Iterate until we find a pipe
+            while (strstr(lineptr, "|") != NULL)
             {
-                // // Check if the first token is a file glob
-                // char **glob = find_glob(cwd, tokens[0]);
+                // Save the file name after as the output file
+                
 
-                // // If the glob is valid and non-empty,
-                // // then print each file in the glob
-                // if (glob != NULL && glob[0] != NULL)
-                // {
-                //     // Print each file in the glob
-                //     for (int i = 0; glob[i] != NULL; i++)
-                //     {
-                //         printf("%s\n", glob[i]);
-                //     }
-                // }
 
-                // // Otherwise, try to execute the command
-                // else
-                // {
-                //     prev_status = exec_command(tokens);
-                // }
-
-                exec_command(tokens);
+            // If user types exit, break
+            if (strcmp(lineptr, "exit") == 0)
+            {
+                break;
             }
-
         } while (1);
 
         return (0);
