@@ -9,7 +9,7 @@
 #define IS_INTERACTIVE (argc == 1)
 #define IS_BATCH (argc == 2)
 #define MAX_TOKENS 1024
-#define DEBUG 1
+#define DEBUG 0
 
 // which ls > some_file
 // pwd > tmp
@@ -191,6 +191,7 @@ int exec_command(char **args)
                 // Redirect STDOUT to output file
                 dup2(fd, STDOUT_FILENO);
 
+                // Close the file descriptor
                 close(fd);
 
                 // Remove redirection symbols and filenames from the args array
@@ -211,12 +212,6 @@ int exec_command(char **args)
         {
             char **glob_results = find_glob(cwd, args[i]);
 
-            // If in DEBUG MODE and find_glob returned NULL, print message
-            if (DEBUG && glob_results == NULL)
-            {
-                printf("No matches for glob pattern: %s\n", args[i]);
-            }
-
             // Replace the original glob pattern with the expanded filenames
             if (glob_results != NULL)
             {
@@ -236,17 +231,6 @@ int exec_command(char **args)
             ++i;
         }
 
-        // Print the args if in debug mode
-        if (DEBUG)
-        {
-            printf("Command: ");
-            for (i = 0; args[i] != NULL; ++i)
-            {
-                printf("%s ", args[i]);
-            }
-            printf("\n");
-        }
-
         // Execute the command
         execvp(args[0], args);
         perror("execvp");
@@ -257,11 +241,7 @@ int exec_command(char **args)
         // Parent process
         // Wait for the child process to finish
         wait(NULL);
-
-        if (DEBUG)
-        {
-            printf("Command executed successfully\n");
-        }
+        printf("Command executed successfully\n");
     }
     else
     {
@@ -327,7 +307,7 @@ int create_pipeline(char **left_args, char **right_args)
         close(pipefd[1]);
 
         // Execute the first command
-        execvp(left_args[0], left_args);
+        execv(left_args[0], left_args);
 
         // If the command fails, print an error and exit
         perror("execvp");
@@ -357,10 +337,10 @@ int create_pipeline(char **left_args, char **right_args)
         close(pipefd[0]);
 
         // Execute the second command
-        execvp(right_args[0], right_args);
+        execv(right_args[0], right_args);
 
         // If the command fails, print an error and exit
-        perror("execv");
+        perror("execvp");
         exit(EXIT_FAILURE);
     }
 
@@ -399,23 +379,22 @@ char **find_glob(char *path, char *pattern)
     pid_t pid;
     int status;
 
-    // Create a pipe
-    int pipefd[2];
-    if (pipe(pipefd) == -1)
-    {
-        perror("mysh");
-        exit(EXIT_FAILURE);
-    }
-
     if ((pid = fork()) == 0)
     {
+        // Create a pipe
+        int pipefd[2];
+        if (pipe(pipefd) == -1)
+        {
+            perror("mysh");
+            exit(EXIT_FAILURE);
+        }
 
-        // Redirect the stdoutput
+        // Redirect standard output
         dup2(pipefd[1], STDOUT_FILENO);
 
         // Create the child process
         // execv("find", (char *const[]){"find", path, "-name", pattern, NULL}) == -1
-        if (execl("/usr/bin/find", "find", path, NULL) == -1)
+        if (execl("/usr/bin/find", "find", path, "-name", pattern, NULL) == -1)
         {
             perror("COULD NOT FIND FILE: mysh");
             exit(EXIT_FAILURE);
@@ -461,9 +440,9 @@ char **find_glob(char *path, char *pattern)
                 perror("mysh");
             }
         }
-    }
 
-    return "HELLO";
+        return NULL;
+    }
 }
 
 /* Built in command: cd*/
