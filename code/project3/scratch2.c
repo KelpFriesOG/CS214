@@ -9,7 +9,7 @@
 #define IS_INTERACTIVE (argc == 1)
 #define IS_BATCH (argc == 2)
 #define MAX_TOKENS 1024
-#define DEBUG 0
+#define DEBUG 1
 
 // which ls > some_file
 // pwd > tmp
@@ -119,60 +119,156 @@ char **process_line(char *line)
 int exec_command(char **args)
 {
 
-    if (args == NULL)
-    {
-        return EXIT_FAILURE;
-    }
+    // Create child process
+    pid_t pid = fork();
 
-    // Make a sub-list of tokens of all the tokens before encountering a >, <, or | (or NULL)
-    char **sublist = NULL;
-    int sublist_size = 0;
-
-    for (int i = 0; args[i] != NULL; i++)
+    // If in the child process
+    if (pid == 0)
     {
-        if (args[i][0] == '>' || args[i][0] == '<' || args[i][0] == '|')
+
+        // Locate input and output redirection
+        int input_redirect_index = -1;
+        int output_redirect_index = -1;
+
+        int i = 0;
+        while (args[i] != NULL)
         {
-            break;
+            if (strcmp(args[i], "<") == 0)
+            {
+                input_redirect_index = i;
+            }
+            else if (strcmp(args[i], ">") == 0)
+            {
+                output_redirect_index = i;
+            }
+            ++i;
         }
-        sublist = (char **)realloc(sublist, (sublist_size + 1) * sizeof(char *));
-        sublist[sublist_size] = args[i];
-        sublist_size++;
-    }
 
-    // Create a child process
-    pid_t pid;
-    int status;
+        // If input redirection symbol was found
+        if (input_redirect_index != -1)
+        {
+            // Ensure that the filename after the symbol is valid
+            if (input_redirect_index + 1 < i && args[input_redirect_index + 1] != NULL)
+            {
+                // Try to open the input file
+                int fd = open(args[input_redirect_index + 1], O_RDONLY);
+                if (fd == -1)
+                {
+                    perror("open");
+                    exit(EXIT_FAILURE);
+                }
 
-    if (DEBUG)
-    {
-        printf("Executing command: %s\n", args[0]);
-    }
-    if ((pid = fork()) == 0)
-    {
+                // Redirect STDIN to input file
+                dup2(fd, STDIN_FILENO);
+
+                close(fd);
+
+                // Remove redirection symbols and filenames from the args array
+                args[input_redirect_index] = NULL;
+                args[input_redirect_index + 1] = NULL;
+            }
+            else
+            {
+                fprintf(stderr, "Error: Input file not specified after '<'\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        // If output redirection symbol was found
+        if (output_redirect_index != -1)
+        {
+            // Ensure that the filename after the symbol is valid
+            if (output_redirect_index + 1 < i && args[output_redirect_index + 1] != NULL)
+            {
+                // Try to open the output file
+                int fd = open(args[output_redirect_index + 1], O_WRONLY | O_CREAT | O_TRUNC, 0666);
+                if (fd == -1)
+                {
+                    perror("open");
+                    exit(EXIT_FAILURE);
+                }
+
+                // Redirect STDOUT to output file
+                dup2(fd, STDOUT_FILENO);
+
+                close(fd);
+
+                // Remove redirection symbols and filenames from the args array
+                args[output_redirect_index] = NULL;
+                args[output_redirect_index + 1] = NULL;
+            }
+            else
+            {
+                fprintf(stderr, "Error: Output file not specified after '>'\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        // Expand globs in the argument list
+        i = 0;
+        char *cwd = getcwd(NULL, 0);
+        while (args[i] != NULL)
+        {
+            char **glob_results = find_glob(cwd, args[i]);
+
+            // If in DEBUG MODE and find_glob returned NULL, print message
+            if (DEBUG && glob_results == NULL)
+            {
+                printf("No matches for glob pattern: %s\n", args[i]);
+            }
+
+            // Replace the original glob pattern with the expanded filenames
+            if (glob_results != NULL)
+            {
+                free(args[i]); // Free the original glob pattern
+                args[i] = glob_results[0];
+            }
+
+            // Free the glob results
+            int j = 0;
+            while (glob_results != NULL && glob_results[j] != NULL)
+            {
+                free(glob_results[j]);
+                ++j;
+            }
+            free(glob_results);
+
+            ++i;
+        }
+
+        // Print the args if in debug mode
+        if (DEBUG)
+        {
+            printf("Command: ");
+            for (i = 0; args[i] != NULL; ++i)
+            {
+                printf("%s ", args[i]);
+            }
+            printf("\n");
+        }
+
         // Execute the command
-        if (execvp(args[0], args) == -1)
-        {
-            perror("mysh");
-            exit(EXIT_FAILURE);
-            return EXIT_FAILURE;
-        }
-
-        // Return exit status of the command
-        return EXIT_SUCCESS;
-    }
-    else if (pid < 0)
-    {
-        perror("mysh");
+        execvp(args[0], args);
+        perror("execvp");
         exit(EXIT_FAILURE);
-        return EXIT_FAILURE;
+    }
+    else if (pid > 0)
+    {
+        // Parent process
+        // Wait for the child process to finish
+        wait(NULL);
+
+        if (DEBUG)
+        {
+            printf("Command executed successfully\n");
+        }
     }
     else
     {
-        // Wait for the child process to finish
-        waitpid(pid, &status, 0);
+        // Error
+        perror("fork");
+        exit(EXIT_FAILURE);
     }
-
-    return EXIT_FAILURE;
 }
 
 /* Function to redirect standard input/output of a program and execute it*/
@@ -231,7 +327,7 @@ int create_pipeline(char **left_args, char **right_args)
         close(pipefd[1]);
 
         // Execute the first command
-        execv(left_args[0], left_args);
+        execvp(left_args[0], left_args);
 
         // If the command fails, print an error and exit
         perror("execvp");
@@ -261,10 +357,10 @@ int create_pipeline(char **left_args, char **right_args)
         close(pipefd[0]);
 
         // Execute the second command
-        execv(right_args[0], right_args);
+        execvp(right_args[0], right_args);
 
         // If the command fails, print an error and exit
-        perror("execvp");
+        perror("execv");
         exit(EXIT_FAILURE);
     }
 
@@ -303,19 +399,23 @@ char **find_glob(char *path, char *pattern)
     pid_t pid;
     int status;
 
+    // Create a pipe
+    int pipefd[2];
+    if (pipe(pipefd) == -1)
+    {
+        perror("mysh");
+        exit(EXIT_FAILURE);
+    }
+
     if ((pid = fork()) == 0)
     {
-        // Create a pipe
-        int pipefd[2];
-        if (pipe(pipefd) == -1)
-        {
-            perror("mysh");
-            exit(EXIT_FAILURE);
-        }
+
+        // Redirect the stdoutput
+        dup2(pipefd[1], STDOUT_FILENO);
 
         // Create the child process
         // execv("find", (char *const[]){"find", path, "-name", pattern, NULL}) == -1
-        if (execl("/usr/bin/find", "find", path, "-name", pattern, NULL) == -1)
+        if (execl("/usr/bin/find", "find", path, NULL) == -1)
         {
             perror("COULD NOT FIND FILE: mysh");
             exit(EXIT_FAILURE);
@@ -361,9 +461,9 @@ char **find_glob(char *path, char *pattern)
                 perror("mysh");
             }
         }
-
-        return NULL;
     }
+
+    return "HELLO";
 }
 
 /* Built in command: cd*/
