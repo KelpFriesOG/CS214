@@ -118,7 +118,6 @@ char **process_line(char *line)
 /* A function that executes a command based on a tokenized list */
 int exec_command(char **args)
 {
-
     // Create child process
     pid_t pid = fork();
 
@@ -211,6 +210,18 @@ int exec_command(char **args)
         while (args[i] != NULL)
         {
             char **glob_results = find_glob(cwd, args[i]);
+            printf("Line: 213");
+
+            // Print glob results (last token guaranteed NULL)
+            if (glob_results != NULL)
+            {
+                int j = 0;
+                while (glob_results[j] != NULL)
+                {
+                    printf("%s\n", glob_results[j]);
+                    ++j;
+                }
+            }
 
             // Replace the original glob pattern with the expanded filenames
             if (glob_results != NULL)
@@ -369,7 +380,6 @@ int is_valid_path(char *path)
 /* Function to find matches to a glob pattern (which contains a SINGLE wildcard)*/
 char **find_glob(char *path, char *pattern)
 {
-    // Pattern matching (w/o using glob function)
     // Create child process that calls find with the given path
     // and glob pattern (using execv)
 
@@ -379,16 +389,16 @@ char **find_glob(char *path, char *pattern)
     pid_t pid;
     int status;
 
+    // Create a pipe
+    int pipefd[2];
+    if (pipe(pipefd) == -1)
+    {
+        perror("mysh");
+        exit(EXIT_FAILURE);
+    }
+
     if ((pid = fork()) == 0)
     {
-        // Create a pipe
-        int pipefd[2];
-        if (pipe(pipefd) == -1)
-        {
-            perror("mysh");
-            exit(EXIT_FAILURE);
-        }
-
         // Redirect standard output
         dup2(pipefd[1], STDOUT_FILENO);
 
@@ -402,31 +412,6 @@ char **find_glob(char *path, char *pattern)
 
         // Close the write end of the pipe
         close(pipefd[1]);
-
-        // Read the output from the child process
-        char buffer[1024];
-        char **output = NULL;
-        int i = 0;
-
-        while (read(pipefd[0], buffer, sizeof(buffer)) > 0)
-        {
-            // If DEBUG, print the output
-            if (DEBUG)
-            {
-                printf("%s", buffer);
-            }
-
-            // Add the output to the list
-            output = (char **)realloc(output, (i + 1) * sizeof(char *));
-            output[i] = buffer;
-            i++;
-        }
-
-        // Close the read end of the pipe
-        close(pipefd[0]);
-
-        // Return the outputted list of files
-        return output;
     }
     else
     {
@@ -441,8 +426,38 @@ char **find_glob(char *path, char *pattern)
             }
         }
 
+        // // Read the contents of pipe from pipefd[0]
+        // char *buffer = malloc(1024);
+        // int bytes_read = read(pipefd[0], buffer, 1024);
+        // buffer[bytes_read] = '\0';
+        // close(pipefd[0]);
+
+        // // Split the buffer into tokens
+        // char *token = strtok(buffer, " \n");
+        // char **tokens = malloc(sizeof(char *) * 1024);
+        // int i = 0;
+        // while (token != NULL)
+        // {
+        //     tokens[i] = token;
+        //     token = strtok(NULL, " \n");
+        //     i++;
+        // }
+        // tokens[i] = NULL;
+
+        /* PROBLEMS STEMS FROM THE TWO LINES BELOW!!! */
+
+        // char *buffer = malloc(1024);
+        // read(pipefd[0], buffer, 1024);
+
+        // Reset such that STDOUT is back to the terminal
+        dup2(1, STDOUT_FILENO);
+
+        // Close the read end of the pipe
+        close(pipefd[0]);
+
         return NULL;
     }
+
 }
 
 /* Built in command: cd*/
@@ -461,6 +476,7 @@ void builtin_cd(char **args)
         // Print current working directory
         printf("%s\n", getcwd(NULL, 0));
     }
+
     return;
 }
 
