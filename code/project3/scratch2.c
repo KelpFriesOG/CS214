@@ -5,6 +5,7 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <fcntl.h>
+#include <dirent.h>
 
 #define IS_INTERACTIVE (argc == 1)
 #define IS_BATCH (argc == 2)
@@ -207,39 +208,44 @@ int exec_command(char **args)
         // Expand globs in the argument list
         i = 0;
         char *cwd = getcwd(NULL, 0);
-        while (args[i] != NULL)
+        for (int i = 0; args[i] != NULL; i++)
         {
-            char **glob_results = find_glob(cwd, args[i]);
-            printf("Line: 213");
+            if (strchr(args[i], '*') != NULL)
+            { // Check for wildcard
+                char **glob_results = find_glob(cwd, args[i]);
 
-            // Print glob results (last token guaranteed NULL)
-            if (glob_results != NULL)
-            {
-                int j = 0;
-                while (glob_results[j] != NULL)
+                if (glob_results != NULL)
                 {
-                    printf("%s\n", glob_results[j]);
-                    ++j;
+                    // Calculate the number of glob results
+                    int glob_count;
+                    for (glob_count = 0; glob_results[glob_count] != NULL; glob_count++)
+                        ;
+
+                    // Resize args to accommodate the glob results
+                    char **new_args = malloc(sizeof(char *) * (i + glob_count + 1));
+                    memcpy(new_args, args, sizeof(char *) * i);
+
+                    // Insert glob results into args
+                    for (int j = 0; j < glob_count; j++)
+                    {
+                        new_args[i + j] = glob_results[j];
+                    }
+
+                    // Copy the rest of the original args
+                    for (int j = i + 1; args[j] != NULL; j++)
+                    {
+                        new_args[j + glob_count - 1] = args[j];
+                    }
+                    new_args[i + glob_count] = NULL;
+
+                    // Replace the old args with new_args
+                    free(args);
+                    args = new_args;
+
+                    // Free glob_results array but not the strings they point to
+                    free(glob_results);
                 }
             }
-
-            // Replace the original glob pattern with the expanded filenames
-            if (glob_results != NULL)
-            {
-                free(args[i]); // Free the original glob pattern
-                args[i] = glob_results[0];
-            }
-
-            // Free the glob results
-            int j = 0;
-            while (glob_results != NULL && glob_results[j] != NULL)
-            {
-                free(glob_results[j]);
-                ++j;
-            }
-            free(glob_results);
-
-            ++i;
         }
 
         // Execute the command
@@ -247,6 +253,7 @@ int exec_command(char **args)
         perror("execvp");
         exit(EXIT_FAILURE);
     }
+
     else if (pid > 0)
     {
         // Parent process
@@ -377,87 +384,65 @@ int is_valid_path(char *path)
     }
 }
 
-/* Function to find matches to a glob pattern (which contains a SINGLE wildcard)*/
-char **find_glob(char *path, char *pattern)
+// Function to check if a filename matches the pattern (assuming simple suffix matching)
+int matches_pattern(const char *filename, const char *pattern)
 {
-    // Create child process that calls find with the given path
-    // and glob pattern (using execv)
-
-    // Then we pipe the result of the command to be returned from this function
-
-    // Create a child process
-    pid_t pid;
-    int status;
-
-    // Create a pipe
-    int pipefd[2];
-    if (pipe(pipefd) == -1)
+    const char *asterisk = strchr(pattern, '*');
+    if (!asterisk)
     {
-        perror("mysh");
-        exit(EXIT_FAILURE);
-    }
-
-    if ((pid = fork()) == 0)
-    {
-        // Redirect standard output
-        dup2(pipefd[1], STDOUT_FILENO);
-
-        // Create the child process
-        // execv("find", (char *const[]){"find", path, "-name", pattern, NULL}) == -1
-        if (execl("/usr/bin/find", "find", path, "-name", pattern, NULL) == -1)
-        {
-            perror("COULD NOT FIND FILE: mysh");
-            exit(EXIT_FAILURE);
-        }
-
-        // Close the write end of the pipe
-        close(pipefd[1]);
+        return strcmp(filename, pattern) == 0;
     }
     else
     {
-        // Wait for the child process to finish
-        waitpid(pid, &status, 0);
+        const char *suffix = asterisk + 1;
+        size_t suffix_len = strlen(suffix);
+        size_t filename_len = strlen(filename);
+        return filename_len >= suffix_len && strcmp(filename + filename_len - suffix_len, suffix) == 0;
+    }
+}
 
-        if (WIFEXITED(status))
-        {
-            if (WEXITSTATUS(status) != 0)
-            {
-                perror("mysh");
-            }
-        }
-
-        // // Read the contents of pipe from pipefd[0]
-        // char *buffer = malloc(1024);
-        // int bytes_read = read(pipefd[0], buffer, 1024);
-        // buffer[bytes_read] = '\0';
-        // close(pipefd[0]);
-
-        // // Split the buffer into tokens
-        // char *token = strtok(buffer, " \n");
-        // char **tokens = malloc(sizeof(char *) * 1024);
-        // int i = 0;
-        // while (token != NULL)
-        // {
-        //     tokens[i] = token;
-        //     token = strtok(NULL, " \n");
-        //     i++;
-        // }
-        // tokens[i] = NULL;
-
-        /* PROBLEMS STEMS FROM THE TWO LINES BELOW!!! */
-
-        // char *buffer = malloc(1024);
-        // read(pipefd[0], buffer, 1024);
-
-        // Reset such that STDOUT is back to the terminal
-        dup2(1, STDOUT_FILENO);
-
-        // Close the read end of the pipe
-        close(pipefd[0]);
-
-        return NULL;
+/* Function to find matches to a glob pattern (which contains a SINGLE wildcard)*/
+char **find_glob(char *path, char *pattern)
+{
+    DIR *dir = opendir(path);
+    if (!dir)
+    {
+        perror("opendir");
+        exit(EXIT_FAILURE);
     }
 
+    struct dirent *entry;
+    char **matches = NULL;
+    size_t count = 0;
+    size_t size = 10; // Initial size
+    matches = malloc(size * sizeof(char *));
+    if (!matches)
+    {
+        perror("malloc");
+        exit(EXIT_FAILURE);
+    }
+
+    while ((entry = readdir(dir)) != NULL)
+    {
+        if (matches_pattern(entry->d_name, pattern))
+        {
+            if (count >= size)
+            {
+                size *= 2;
+                matches = realloc(matches, size * sizeof(char *));
+                if (!matches)
+                {
+                    perror("realloc");
+                    exit(EXIT_FAILURE);
+                }
+            }
+            matches[count++] = strdup(entry->d_name);
+        }
+    }
+    matches[count] = NULL; // Null-terminate the array
+
+    closedir(dir);
+    return matches;
 }
 
 /* Built in command: cd*/
