@@ -1,0 +1,254 @@
+## Multithreading
+
+---
+
+idea: multiple tasks within a single process
+
+- Threads share all of memory (especially heap memory and global variables).
+- This is the primary advantage (and hassle) with multithreading.
+
+Shared memory is the greatest source of bugs and confusing behavior.
+
+How do we coordinate these threads and their access to shared data?
+
+Ex: Suppose an integer shared between two threads.
+- The threads increment the integer.
+
+Lets say that the count is initially 0, both threads increment the count,
+what is the resulting value?
+
+PROBLEM: Incrementing a global variable is "non-atomic" (there are multiple steps)
+
+1. Get the current value of the global (store in a register)
+2. Compute value + 1 (still in a register)
+3. Write updated value to memory
+
+The second thread may increment the value of 0 (which is the value of the integer before
+step 3). Or it may increment the value of 1 (which is the intended behavior of incrementing
+after thread 1 performs step 3).
+
+We have not enforced any sort of ordering on these threads.
+
+Ideal scenario
+
+Thread A
+-> reads global (value of 0)
+-> obtains 0
+-> increments value to 1
+-> write 1 to count
+
+Thread B
+-> read global (value of 1)
+-> obtains 1
+-> increments value to 2
+-> write 2 to count
+
+Alternatively thread B could go first (as long as one finishes before another one ends
+we are fine).
+
+Problematic scenario
+
+-> Thread A reads 0
+-> Thread B reads 0
+-> Thread A increments value it has to 1
+-> Thread B increments value it has to 1
+-> Thread A writes 1 into memory
+-> Thread B writes 1 into memory
+
+Final value in memory: 1
+
+Interweaving the threads like this is not the intended result.
+
+- Therefore we need to enforce ordering for non-atomic operations.
+
+- Data based on old reads can get written into memory which makes bugs
+very hard to debug since the program is non-deterministic.
+
+If you EVER have uncontrolled write access to a resources there is potential
+for this undesired non-deterministic behavior.
+
+How do we fix this issue? (Coordination)
+
+2 Strategies
+
+1) Transactional operations
+- Before we write to memory, we make sure the value there is already the one
+we expect.
+2) Enforce single-thread access
+- Essentially, make the operation atomic. While one thread has access to the
+shared value, no other thread can read or write to it.
+
+---
+
+How do we actually enforce mutual exclusion (single thread access)?
+
+- Maybe we could have a bit that marks when a value is being used / is reserved.
+If the bit is 0, then the thread can use the resource and sets that bit to 1.
+If the bit is 1, the thread has to wait before using the resource.
+
+This code is sometimes referred to as a spinlock
+
+while (in_use != 0) /* Do nothing */
+in_use = 1;
+count++;
+in_use = 0;
+
+Does this solution have a problem?
+
+Checking the bit and setting it to 0 are two distinc operation, another thread
+could read the bit before we are able to update it.
+
+---
+
+With the supposition of preemptive multithreading, there is no software level solution
+- We need the hardware to be able to step in!
+
+There are a few atomic instuctions we could use:
+
+Ex: test-and-set
+
+- You give the program a memory location, a value to write, and a value that is expected
+to be at the memory location.
+
+- IN A SINGLE STEP, we write the value to memory only if the expected value is present.
+- We can then report back whether we succeeded.
+
+This is an atomic solution which is supported by the hardware, otherwise it would be useless.
+
+
+In the context of our previous spinlock solution,
+this lets us combin checking if in_use == 0 and in_use = 1 
+into a single atomic operation.
+
+- Any other thread that checks in_use will go after our operation or before it,
+enforcing a stronger order, but really nothing really stops another thread from
+writing to it inappropriately. (But in order for another thread to do this,
+you would have to code it yourself).
+
+- This gives us the ability to coordinate access, but it is up to us to do this
+coordination correctly.
+
+---
+
+We do not have an atomic "test and set" instruction in C
+
+- We just use a library instruction (or else we put in assembly instructions ourselves).
+- We hate assembly, we hate assembly, we hate assembly. Say it with me.
+
+We use the pthread library and a function called mutex().
+
+mutex()
+
+pthread_mutex_t mut; // Corresponds to our "in-use" bit / flag.
+
+// We then use the pthread mutex init function which has the
+// following type signature.
+
+int pthread_mutex_init(
+	pthread_mutex_t *mutex,
+	pthread_mutexattr_t *attr)
+};
+
+// We also have to use the corresponding lock function to obtain
+// exclusive access (sets the inuse flag to 1)
+
+int pthread_mutex_loxk(
+	pthread_mutex_t *mutex
+);
+
+// If another thread alreay has exlusive access, we block until they are done.
+
+// We use the unlock function to remove the exlcusive access
+
+int pthread_mutex_unlock(
+	pthread_mutex_t *mutex
+);
+
+// If other threads are waiting and  locked, wake one of them up. (AKA sleeping threads)
+
+---
+
+Now our ideal order of operations looks like
+
+thread 0
+---
+
+// global variables: count, lock
+
+pthread_mutex_init(&lock, NULL);
+pthread_create(...thread A...);
+pthread_create(...thread B...);
+
+threads A and B
+---
+pthread_mutex_lock(&mut);
+count++;
+pthread_mutex_unlock(&mut);
+
+
+---
+
+A rule for mutexes:
+- We already enforce that only one thread can lock the mutex at a time.
+- Only the thread that has locked the mutex can unlock it.
+
+What stops me from calling unlock, even if I'm not the thread that initially
+locked the mutex?
+
+Nothing.
+
+Just don't do it, don't write code that does this.
+
+By default, we use "fast mutexes" which do not check whether the thread
+calling unlock is the thread that locked the mutex.
+
+But we can use a different type of mutex that checks for this error.
+This mutex will fail if the thread calling unlock is not 
+the same thread that locked the mutex.
+
+-> However such a check should not be needed unless your own code has some issues.
+
+Ideally, lock and unlock should be in the function and you should not hold a lock for
+a long period of time.
+
+- You can use ThreadSanitizer but it has some kinks and false positives and
+false negatives. ThreadSanitizer also doesn't work well alongside AddressSanitizer.
+
+---
+
+(One potential) Strategy to use these tools
+
+1) Design thread safe data structures
+2) Access data through accessor functions which are also responsible for obtaining
+and releasing locks.
+
+
+Ex:
+
+typedef struct {
+	pthread_mutex_t lock;
+	int count;
+} counter_t;
+
+void increment(counter_t *counter){
+
+	pthread_mutex_lock(&counter->lock);
+	counter->count++;
+	pthread_mutex_unlock(&counter->lock);
+
+}
+
+- Increment is now considered a thread-safe function
+- Calls to increment are "synchronized", effectively an atomic increment function.
+
+Nothing stops a thread from modififying count without getting the lock!
+- It is your responsibilty to enforce your own access rules.
+
+
+
+
+
+
+
+
+

@@ -25,6 +25,7 @@ void builtin_exit(char **args);
 int is_builtin(char **line);
 int is_valid_path(char *path);
 int exec_command(char **args);
+int create_pipeline(char **leftargs, char **rightargs);
 
 // List of built-in commands
 char *builtin_commands[] = {"cd", "pwd", "which", "exit"};
@@ -129,6 +130,7 @@ int exec_command(char **args)
         // Locate input and output redirection
         int input_redirect_index = -1;
         int output_redirect_index = -1;
+        int pipeline_index = -1;
 
         int i = 0;
         while (args[i] != NULL)
@@ -141,7 +143,96 @@ int exec_command(char **args)
             {
                 output_redirect_index = i;
             }
+            else if (strcmp(args[i], "|") == 0)
+            {
+                pipeline_index = i;
+            }
+
             ++i;
+        }
+
+        // If pipeline symbol was found
+        if (pipeline_index != -1)
+        {
+            // Create two sets of arguments for the two processes
+            char **args1 = (char **)malloc((pipeline_index + 1) * sizeof(char *));
+            char **args2 = (char **)malloc((i - pipeline_index) * sizeof(char *));
+
+            // Copy the first part of the list (replace pipeline symbol with NULL)
+            for (int j = 0; j < pipeline_index + 1; j++)
+            {
+                args1[j] = args[j];
+            }
+            args1[pipeline_index] = NULL;
+
+            // Copy the second part of the list
+            for (int j = 0; j < i - pipeline_index; j++)
+            {
+                args2[j] = args[j + pipeline_index + 1];
+            }
+            args2[i - pipeline_index - 1] = NULL;
+
+            // If in DEBUG mode, print both lists of arguments
+            if (DEBUG)
+            {
+                printf("args1: ");
+                for (int j = 0; j < pipeline_index + 1; j++)
+                {
+                    printf("%s ", args1[j]);
+                }
+                printf("\n");
+                printf("args2: ");
+                for (int j = 0; j < i - pipeline_index; j++)
+                {
+                    printf("%s ", args2[j]);
+                }
+                printf("\n");
+            }
+
+            // Set up pipeline between two processes
+            int pipefd[2];
+            if (pipe(pipefd) == -1)
+            {
+                perror("pipe");
+            }
+
+            // Create child process
+            pid_t pid1 = fork();
+
+            if (pid1 == 0)
+            {
+                // Close unused end of the pipe
+                close(pipefd[0]);
+
+                // Redirect stdout to the write end of the pipe
+                dup2(pipefd[1], STDOUT_FILENO);
+
+                // Execute the first command
+                execvp(args1[0], args1);
+
+                perror("execvp");
+
+                exit(EXIT_FAILURE);
+            }
+
+            // Create child process
+            pid_t pid2 = fork();
+
+            if (pid2 == 0)
+            {
+                // Close unused end of the pipe
+                close(pipefd[1]);
+
+                // Take input from the read end of the pipe.
+                dup2(pipefd[0], STDIN_FILENO);
+
+                // Execute the second command
+                execvp(args2[0], args2);
+
+                perror("execvp");
+
+                exit(EXIT_FAILURE);
+            }
         }
 
         // If input redirection symbol was found
@@ -253,7 +344,6 @@ int exec_command(char **args)
         perror("execvp");
         exit(EXIT_FAILURE);
     }
-
     else if (pid > 0)
     {
         // Parent process
@@ -299,7 +389,7 @@ int create_pipeline(char **left_args, char **right_args)
     if (pipe(pipefd) == -1)
     {
         perror("pipe");
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     // Fork the first process
@@ -308,7 +398,7 @@ int create_pipeline(char **left_args, char **right_args)
     if (pid1 == -1)
     {
         perror("fork");
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     // If pid1 is 0, then we are in the first child process
@@ -324,12 +414,12 @@ int create_pipeline(char **left_args, char **right_args)
         // We can techinically close the write end of the pipe here
         close(pipefd[1]);
 
-        // Execute the first command
-        execv(left_args[0], left_args);
+        // Execute the first command using exec_command
+        exec_command(left_args);
 
         // If the command fails, print an error and exit
         perror("execvp");
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     // Fork the second process
@@ -338,7 +428,7 @@ int create_pipeline(char **left_args, char **right_args)
     if (pid2 == -1)
     {
         perror("fork");
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     // If pid2 is 0, then we are in the second child process
@@ -355,11 +445,11 @@ int create_pipeline(char **left_args, char **right_args)
         close(pipefd[0]);
 
         // Execute the second command
-        execv(right_args[0], right_args);
+        exec_command(right_args);
 
         // If the command fails, print an error and exit
         perror("execvp");
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     // Close both ends of the pipe in the parent
