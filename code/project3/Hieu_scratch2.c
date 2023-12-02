@@ -26,8 +26,7 @@ int is_builtin(char **line);
 int is_valid_path(char *path);
 int exec_command(char **args);
 int create_pipeline(char **leftargs, char **rightargs);
-char** glob_eval(char **args);
-
+char **glob_eval(char **args);
 
 // List of built-in commands
 char *builtin_commands[] = {"cd", "pwd", "which", "exit"};
@@ -122,7 +121,7 @@ char **process_line(char *line)
 /* A function that executes a command based on a tokenized list */
 int exec_command(char **args)
 {
-    
+
     // Create child process
     pid_t pid = fork();
 
@@ -321,51 +320,51 @@ int exec_command(char **args)
     }
 }
 
+char **glob_eval(char **args)
+{
 
-char** glob_eval(char **args){
-    
     int i = 0;
     char *cwd = getcwd(NULL, 0);
     for (int i = 0; args[i] != NULL; i++)
-        {
-            if (strchr(args[i], '*') != NULL)
-            { // Check for wildcard
-                char **glob_results = find_glob(cwd, args[i]);
+    {
+        if (strchr(args[i], '*') != NULL)
+        { // Check for wildcard
+            char **glob_results = find_glob(cwd, args[i]);
 
-                if (glob_results != NULL)
+            if (glob_results != NULL)
+            {
+                // Calculate the number of glob results
+                int glob_count;
+                for (glob_count = 0; glob_results[glob_count] != NULL; glob_count++)
+                    ;
+
+                // Resize args to accommodate the glob results
+                char **new_args = malloc(sizeof(char *) * (i + glob_count + 1));
+                memcpy(new_args, args, sizeof(char *) * i);
+
+                // Insert glob results into args
+                for (int j = 0; j < glob_count; j++)
                 {
-                    // Calculate the number of glob results
-                    int glob_count;
-                    for (glob_count = 0; glob_results[glob_count] != NULL; glob_count++)
-                        ;
-
-                    // Resize args to accommodate the glob results
-                    char **new_args = malloc(sizeof(char *) * (i + glob_count + 1));
-                    memcpy(new_args, args, sizeof(char *) * i);
-
-                    // Insert glob results into args
-                    for (int j = 0; j < glob_count; j++)
-                    {
-                        new_args[i + j] = glob_results[j];
-                    }
-
-                    // Copy the rest of the original args
-                    for (int j = i + 1; args[j] != NULL; j++)
-                    {
-                        new_args[j + glob_count - 1] = args[j];
-                    }
-                    new_args[i + glob_count] = NULL;
-
-                    // Replace the old args with new_args
-                    free(args);
-                    args = new_args;
-
-                    // Free glob_results array but not the strings they point to
-                    free(glob_results);
+                    new_args[i + j] = glob_results[j];
                 }
+
+                // Copy the rest of the original args
+                for (int j = i + 1; args[j] != NULL; j++)
+                {
+                    new_args[j + glob_count - 1] = args[j];
+                }
+                new_args[i + glob_count] = NULL;
+
+                // Replace the old args with new_args
+                free(args);
+                args = new_args;
+
+                // Free glob_results array but not the strings they point to
+                free(glob_results);
             }
         }
-        return args;
+    }
+    return args;
 }
 
 /* Function to redirect standard input/output of a program and execute it*/
@@ -648,17 +647,23 @@ int is_builtin(char **line)
     // Else return 0
     return 0;
 }
-void execute_batch_file(FILE *fp) {
+
+void execute_batch_file(FILE *fp)
+{
     char *lineptr = NULL;
     size_t n = 0;
-    while (getline(&lineptr, &n, fp) != -1) {
-        if (lineptr[strlen(lineptr) - 1] == '\n') {
+    while (getline(&lineptr, &n, fp) != -1)
+    {
+        if (lineptr[strlen(lineptr) - 1] == '\n')
+        {
             lineptr[strlen(lineptr) - 1] = '\0';
         }
 
         char **tokens = process_line(lineptr);
-        if (tokens != NULL) {
-            if (!is_builtin(tokens)) {
+        if (tokens != NULL)
+        {
+            if (!is_builtin(tokens))
+            {
                 exec_command(tokens);
             }
         }
@@ -675,9 +680,11 @@ int main(int argc, char **argv)
     /* Is this program is run in batch mode, try to open
      * the file specified in argv[1] */
 
-    if (IS_BATCH) {
+    if (IS_BATCH)
+    {
         FILE *fp = fopen(argv[1], "r");
-        if (fp == NULL) {
+        if (fp == NULL)
+        {
             fprintf(stderr, "Error: Could not open file %s\n", argv[1]);
             exit(1);
         }
@@ -720,12 +727,12 @@ int main(int argc, char **argv)
             {
                 continue;
             }
-            else if(tokens[0] == 'then' && succ_check == 0){
+            else if (tokens[0] == 'then' && succ_check == 0)
+            {
                 succ_check = exec_command(tokens);
-                
             }
-            else if(tokens[0] == 'else' && succ_check != 0){
-
+            else if (tokens[0] == 'else' && succ_check != 0)
+            {
             }
 
             else

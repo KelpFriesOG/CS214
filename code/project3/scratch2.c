@@ -141,7 +141,7 @@ int exec_command(char **args)
         int output_redirect_index = -1;
         int pipeline_index = -1;
 
-        int i = 0;
+        i = 0;
         while (args[i] != NULL)
         {
             if (strcmp(args[i], "<") == 0)
@@ -160,7 +160,7 @@ int exec_command(char **args)
             ++i;
         }
 
-        char **args1 = NULL;
+        char **args1 = args;
         char **args2 = NULL;
 
         // If pipeline symbol was found
@@ -308,7 +308,7 @@ int exec_command(char **args)
         }
 
         // Execute the command
-        execvp(args[0], args);
+        execvp(args[0], args1);
         perror("execvp");
         exit(EXIT_FAILURE);
     }

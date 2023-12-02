@@ -26,9 +26,8 @@ int is_builtin(char **line);
 int is_valid_path(char *path);
 int exec_command(char **args);
 int create_pipeline(char **leftargs, char **rightargs);
-char** glob_eval(char **args);
+char **glob_eval(char **args);
 void execute_pipe(char **tokens);
-
 
 // List of built-in commands
 char *builtin_commands[] = {"cd", "pwd", "which", "exit"};
@@ -321,20 +320,26 @@ int exec_command(char **args)
         exit(EXIT_FAILURE);
     }
 }
-char** glob_eval(char **args) {
+char **glob_eval(char **args)
+{
     char *cwd = getcwd(NULL, 0);
     char **new_args = NULL;
     int new_arg_count = 0;
 
-    for (int i = 0; args[i] != NULL; i++) {
-        if (strchr(args[i], '*') != NULL) {
+    for (int i = 0; args[i] != NULL; i++)
+    {
+        if (strchr(args[i], '*') != NULL)
+        {
             // Expand the glob pattern
             char **glob_results = find_glob(cwd, args[i]);
-            if (glob_results != NULL) {
+            if (glob_results != NULL)
+            {
                 // Add each result to new_args
-                for (int j = 0; glob_results[j] != NULL; j++) {
+                for (int j = 0; glob_results[j] != NULL; j++)
+                {
                     new_args = realloc(new_args, sizeof(char *) * (new_arg_count + 1));
-                    if (new_args == NULL) {
+                    if (new_args == NULL)
+                    {
                         perror("realloc");
                         exit(EXIT_FAILURE);
                     }
@@ -342,10 +347,13 @@ char** glob_eval(char **args) {
                 }
                 free(glob_results); // Free the array, not the strings
             }
-        } else {
+        }
+        else
+        {
             // Copy the non-glob argument
             new_args = realloc(new_args, sizeof(char *) * (new_arg_count + 1));
-            if (new_args == NULL) {
+            if (new_args == NULL)
+            {
                 perror("realloc");
                 exit(EXIT_FAILURE);
             }
@@ -362,9 +370,6 @@ char** glob_eval(char **args) {
 
     return new_args;
 }
-
-
-
 
 /* Function to redirect standard input/output of a program and execute it*/
 int redirect_io(char *program, char **args, int in_or_out)
@@ -646,17 +651,22 @@ int is_builtin(char **line)
     // Else return 0
     return 0;
 }
-void execute_batch_file(FILE *fp) {
+void execute_batch_file(FILE *fp)
+{
     char *lineptr = NULL;
     size_t n = 0;
-    while (getline(&lineptr, &n, fp) != -1) {
-        if (lineptr[strlen(lineptr) - 1] == '\n') {
+    while (getline(&lineptr, &n, fp) != -1)
+    {
+        if (lineptr[strlen(lineptr) - 1] == '\n')
+        {
             lineptr[strlen(lineptr) - 1] = '\0';
         }
 
         char **tokens = process_line(lineptr);
-        if (tokens != NULL) {
-            if (!is_builtin(tokens)) {
+        if (tokens != NULL)
+        {
+            if (!is_builtin(tokens))
+            {
                 exec_command(tokens);
             }
         }
@@ -666,16 +676,18 @@ void execute_batch_file(FILE *fp) {
     free(lineptr);
 }
 
-
 // This function should handle the pipe logic
-void execute_pipe(char **tokens) {
+void execute_pipe(char **tokens)
+{
     // Expand globs for the entire command line before splitting
     tokens = glob_eval(tokens);
 
     // Find the pipe symbol and split the command
     int i;
-    for (i = 0; tokens[i] != NULL; i++) {
-        if (strcmp(tokens[i], "|") == 0) {
+    for (i = 0; tokens[i] != NULL; i++)
+    {
+        if (strcmp(tokens[i], "|") == 0)
+        {
             tokens[i] = NULL; // Null-terminate the left command
             break;
         }
@@ -687,18 +699,21 @@ void execute_pipe(char **tokens) {
     int pipefd[2];
     pid_t pid1, pid2;
 
-    if (pipe(pipefd) < 0) {
+    if (pipe(pipefd) < 0)
+    {
         perror("pipe");
         exit(EXIT_FAILURE);
     }
 
     pid1 = fork();
-    if (pid1 < 0) {
+    if (pid1 < 0)
+    {
         perror("fork");
         exit(EXIT_FAILURE);
     }
 
-    if (pid1 == 0) {
+    if (pid1 == 0)
+    {
         // Child 1: Will execute the left side of the pipe
         dup2(pipefd[1], STDOUT_FILENO);
         close(pipefd[0]);
@@ -709,12 +724,14 @@ void execute_pipe(char **tokens) {
     }
 
     pid2 = fork();
-    if (pid2 < 0) {
+    if (pid2 < 0)
+    {
         perror("fork");
         exit(EXIT_FAILURE);
     }
 
-    if (pid2 == 0) {
+    if (pid2 == 0)
+    {
         // Child 2: Will execute the right side of the pipe
         dup2(pipefd[0], STDIN_FILENO);
         close(pipefd[1]);
@@ -731,19 +748,17 @@ void execute_pipe(char **tokens) {
     waitpid(pid2, NULL, 0);
 }
 
-
-
-
-
-
 // Main function
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
     char *prompt = "mysh> ";
 
     /* Check if the program is run in batch mode */
-    if (IS_BATCH) {
+    if (IS_BATCH)
+    {
         FILE *fp = fopen(argv[1], "r");
-        if (fp == NULL) {
+        if (fp == NULL)
+        {
             fprintf(stderr, "Error: Could not open file %s\n", argv[1]);
             exit(1);
         }
@@ -754,12 +769,14 @@ int main(int argc, char **argv) {
     }
 
     /* If the program is set to run in interactive mode */
-    if (IS_INTERACTIVE) {
+    if (IS_INTERACTIVE)
+    {
         char *lineptr = NULL;
         size_t n = 0;
 
         // Continue until user types exit
-        do {
+        do
+        {
             // Print prompt
             printf("%s", prompt);
 
@@ -767,7 +784,8 @@ int main(int argc, char **argv) {
             getline(&lineptr, &n, stdin);
 
             // Remove trailing newline
-            if (lineptr[strlen(lineptr) - 1] == '\n') {
+            if (lineptr[strlen(lineptr) - 1] == '\n')
+            {
                 lineptr[strlen(lineptr) - 1] = '\0';
             }
 
@@ -776,35 +794,39 @@ int main(int argc, char **argv) {
 
             // Check for a pipe symbol
             int has_pipe = 0;
-            for (int i = 0; tokens && tokens[i] != NULL; i++) {
-                if (strcmp(tokens[i], "|") == 0) {
+            for (int i = 0; tokens && tokens[i] != NULL; i++)
+            {
+                if (strcmp(tokens[i], "|") == 0)
+                {
                     has_pipe = 1;
                     break;
                 }
             }
 
             // Execute commands based on whether a pipe is present
-            if (has_pipe) {
+            if (has_pipe)
+            {
                 // Execute the pipe command
                 execute_pipe(tokens);
-            } else {
+            }
+            else
+            {
                 // Handle non-pipe commands
-                if (tokens != NULL) {
-                    if (!is_builtin(tokens)) {
+                if (tokens != NULL)
+                {
+                    if (!is_builtin(tokens))
+                    {
                         exec_command(tokens);
                     }
                 }
             }
 
             // Free tokens and other resources as needed
-            free(tokens);
-            tokens = NULL;
+            // free(tokens);
+            // tokens = NULL;
         } while (1);
 
         free(lineptr);
         return 0;
     }
 }
-
-
-
