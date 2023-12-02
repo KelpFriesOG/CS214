@@ -648,7 +648,25 @@ int is_builtin(char **line)
     // Else return 0
     return 0;
 }
+void execute_batch_file(FILE *fp) {
+    char *lineptr = NULL;
+    size_t n = 0;
+    while (getline(&lineptr, &n, fp) != -1) {
+        if (lineptr[strlen(lineptr) - 1] == '\n') {
+            lineptr[strlen(lineptr) - 1] = '\0';
+        }
 
+        char **tokens = process_line(lineptr);
+        if (tokens != NULL) {
+            if (!is_builtin(tokens)) {
+                exec_command(tokens);
+            }
+        }
+
+        free(tokens);
+    }
+    free(lineptr);
+}
 // Main function
 int main(int argc, char **argv)
 {
@@ -657,14 +675,16 @@ int main(int argc, char **argv)
     /* Is this program is run in batch mode, try to open
      * the file specified in argv[1] */
 
-    if (IS_BATCH)
-    {
+    if (IS_BATCH) {
         FILE *fp = fopen(argv[1], "r");
-        if (fp == NULL)
-        {
+        if (fp == NULL) {
             fprintf(stderr, "Error: Could not open file %s\n", argv[1]);
             exit(1);
         }
+
+        execute_batch_file(fp);
+        fclose(fp);
+        exit(0);
     }
 
     /* If this program is set to run in interactive mode, enter a do-while loop*/
