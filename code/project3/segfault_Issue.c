@@ -24,14 +24,13 @@ int builtin_which(char **args);
 void builtin_exit(char **args);
 int is_builtin(char **line);
 int is_valid_path(char *path);
-int exec_command(char **args, int argc, int* status);
+int exec_command(char **args, int argc, int *status);
 int create_pipeline(char **leftargs, char **rightargs);
 char **glob_eval(char **args);
-int execute_pipe(char **tokens, int argc, int* status);
+int execute_pipe(char **tokens, int argc, int *status);
 
 // List of built-in commands
 char *builtin_commands[] = {"cd", "pwd", "which", "exit"};
-
 
 /* BETTER Function that processes a line and returns a pointer to the tokens*/
 char **process_line(char *line)
@@ -121,33 +120,29 @@ char **process_line(char *line)
 }
 
 /* A function that executes a command based on a tokenized list */
-int exec_command(char **args, int argc, int* status)
+int exec_command(char **args, int argc, int *status)
 {
     int count = 0;
-    for(int i = 0; args[i]!= NULL; i++){
+    for (int i = 0; args[i] != NULL; i++)
+    {
         count++;
     }
     printf("%d", count);
     *status = 100;
-    
+
     args = glob_eval(args);
     // Keep track of status of command
-    
-
-
 
     // If the entire command array is 1 argument
     if (argc == 1)
     {
         // Execute the command (if it is builtin) (only works for pwd and exit)
-       
+
         if ((status = is_builtin(args)) == 0)
         {
             // builtin_exit(args);
             return;
         }
-        
-
     }
 
     // If the entire command array begins with cd then
@@ -162,15 +157,12 @@ int exec_command(char **args, int argc, int* status)
 
         builtin_cd(args);
         return;
-        
     }
 
-    
     // Create child process
     pid_t pid = fork();
 
-    
-    printf("\npid is: %d\n" , pid);
+    printf("\npid is: %d\n", pid);
 
     // If in the child process
     if (pid == 0)
@@ -350,7 +342,6 @@ int exec_command(char **args, int argc, int* status)
         // If the command is a builtin command,
         // execute it
         status = is_builtin(args);
-        
 
         // Expand globs in the argument list
         args = glob_eval(args);
@@ -380,9 +371,7 @@ int exec_command(char **args, int argc, int* status)
         // Error
         perror("fork");
         status = 1;
-        
     }
-
 }
 
 char **glob_eval(char **args)
@@ -390,7 +379,6 @@ char **glob_eval(char **args)
     char *cwd = getcwd(NULL, 0);
     char **new_args = NULL;
     int new_arg_count = 0;
-    
 
     for (int i = 0; args[i] != NULL; i++)
     {
@@ -440,7 +428,7 @@ char **glob_eval(char **args)
 /* Function to redirect standard input/output of a program and execute it*/
 int redirect_io(char *program, char **args, int in_or_out)
 {
-    
+
     // If the in_or_out is 0, then we redirect standard input using freopen
     if (in_or_out == 0)
     {
@@ -723,7 +711,8 @@ int is_builtin(char **line)
     // Else return 1
     return 1;
 }
-void execute_batch_file(FILE *fp, int* status)
+
+void execute_batch_file(FILE *fp, int *status)
 {
     char *lineptr = NULL;
     size_t n = 0;
@@ -757,11 +746,10 @@ void execute_batch_file(FILE *fp, int* status)
 }
 
 // This function should handle the pipe logic
-int execute_pipe(char **tokens, int argc, int* status)
+int execute_pipe(char **tokens, int argc, int *status)
 {
     // Expand globs for the entire command line before splitting
     tokens = glob_eval(tokens);
-
 
     // Check if there is any symbol following the cd command and see if its a pipe
     if (argc > 2 && strcmp(tokens[0], "cd") == 0)
@@ -893,7 +881,6 @@ int main(int argc, char **argv)
     {
         char *lineptr = NULL;
         size_t n = 0;
-        int status = -1;
         // Continue until user types exit
         do
         {
@@ -929,7 +916,7 @@ int main(int argc, char **argv)
                     break;
                 }
             }
-            
+
             // Execute commands based on whether a pipe is present
             if (has_pipe)
             {
@@ -938,7 +925,7 @@ int main(int argc, char **argv)
             }
             else
             {
-                
+
                 // Handle non-pipe commands
                 if (tokens != NULL)
                 {
@@ -949,9 +936,8 @@ int main(int argc, char **argv)
                         printf("pre-tokens\n");
 
                         int count = sizeof(tokens) / sizeof(4);
-                        
+
                         printf("%d", count);
-                        
 
                         // Copy over tokens into new arguments starting after the "then" or "else"
                         /*
@@ -961,22 +947,22 @@ int main(int argc, char **argv)
                             new_tokens[i - 1] = tokens[i];
                         }
                         */
-                        
-                        printf("after tok");
 
+                        printf("after tok");
 
                         // Execute the command
                         exec_command(tokens, token_count - 1, status);
                         continue;
-                    }else if(strcmp(tokens[0], "then") != 0 && (strcmp(tokens[0], "else") != 0)){
-
+                    }
+                    else if (strcmp(tokens[0], "then") != 0 && (strcmp(tokens[0], "else") != 0))
+                    {
 
                         exec_command(tokens, token_count, &status);
-                    }else{
+                    }
+                    else
+                    {
                         continue;
                     }
-
-
                 }
 
                 printf("\n outside not null\n");
