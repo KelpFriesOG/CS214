@@ -26,6 +26,8 @@ int is_builtin(char **line);
 int is_valid_path(char *path);
 int exec_command(char **args, int argc);
 char **glob_eval(char **args);
+void fix_then_else(char **args, int count);
+int execute_pipe(char **tokens, int argc);
 
 char *builtin_commands[] = {"cd", "pwd", "which", "exit"};
 
@@ -555,29 +557,96 @@ void execute_batch_file(FILE *fp)
 
     while (getline(&lineptr, &n, fp) != -1)
     {
+
+        
         if (lineptr[strlen(lineptr) - 1] == '\n')
         {
             lineptr[strlen(lineptr) - 1] = '\0';
         }
 
         char **tokens = process_line(lineptr);
-
+        
         // Count up the number of tokens
-        int num_tokens = 0;
-        while (tokens[num_tokens] != NULL)
+        int token_count = 0;
+        while (tokens[token_count] != NULL)
         {
-            num_tokens++;
+            token_count++;
         }
-
-        if (tokens != NULL)
-        {
-            if (!is_builtin(tokens))
+        
+            int has_pipe = 0;
+            for (int i = 0; tokens && tokens[i] != NULL; i++)
             {
-                status = exec_command(tokens, num_tokens);
+                if (strcmp(tokens[i], "|") == 0)
+                {
+                    has_pipe = 1;
+                    break;
+                }
             }
-        }
 
-        free(tokens);
+            
+            // Execute commands based on whether a pipe is present
+            if (has_pipe)
+            {
+                
+                if ((strcmp(tokens[0], "then") == 0 && status == 0) ||
+                    (strcmp(tokens[0], "else") == 0 && status != 0))
+                {
+                    fix_then_else(tokens,token_count);
+                    status = execute_pipe(tokens, token_count-1);
+                    continue;
+
+                }
+                else if (strcmp(tokens[0], "then") != 0 && (strcmp(tokens[0], "else") != 0))
+                {
+                    
+                    //printf("\npre exec (not in then or else)\n");
+                    status = execute_pipe(tokens, token_count);
+                }
+                else
+                {
+                    continue;
+                }
+                // Execute the pipe command
+
+
+            }
+            else
+            {
+
+                // Handle non-pipe commands
+                if (tokens != NULL)
+                {
+
+                    // If first token is "then" or "else" and status is 0 or not 0 respectively.
+                    if ((strcmp(tokens[0], "then") == 0 && status == 0) ||
+                        (strcmp(tokens[0], "else") == 0 && status != 0))
+                    {
+                        //printf("pre-tokens\n");
+
+
+                        // Copy over tokens into new arguments starting after the "then" or "else"
+
+                        fix_then_else(tokens,token_count);
+                        
+                        //printf("\npre exec\n");
+                        // Execute the command
+                        status = exec_command(tokens, token_count - 1);
+                        continue;
+                    }
+                    else if (strcmp(tokens[0], "then") != 0 && (strcmp(tokens[0], "else") != 0))
+                    {
+                        
+                        //printf("\npre exec (not in then or else)\n");
+                        status = exec_command(tokens, token_count);
+                    }
+                    else
+                    {
+                        continue;
+                    }
+                }
+
+            }
+        
     }
     free(lineptr);
 }
@@ -753,6 +822,7 @@ int main(int argc, char *argv[])
     /* Check if the program is run in batch mode */
     if (IS_BATCH)
     {
+        
         FILE *fp = fopen(argv[1], "r");
         if (fp == NULL)
         {
