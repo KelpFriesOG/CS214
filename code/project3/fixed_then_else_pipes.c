@@ -813,8 +813,26 @@ int main(int argc, char *argv[])
             // Execute commands based on whether a pipe is present
             if (has_pipe)
             {
+                
+                if ((strcmp(tokens[0], "then") == 0 && status == 0) ||
+                    (strcmp(tokens[0], "else") == 0 && status != 0))
+                {
+                    fix_then_else(tokens,token_count);
+                    status = execute_pipe(tokens, token_count-1);
+                    continue;
+
+                }
+                else if (strcmp(tokens[0], "then") != 0 && (strcmp(tokens[0], "else") != 0))
+                {
+                    
+                    //printf("\npre exec (not in then or else)\n");
+                    status = execute_pipe(tokens, token_count);
+                }
+                else
+                {
+                    continue;
+                }
                 // Execute the pipe command
-                status = execute_pipe(tokens, token_count);
 
 
             }
