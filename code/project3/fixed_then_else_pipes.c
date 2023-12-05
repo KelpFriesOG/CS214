@@ -11,8 +11,7 @@
 
 #define IS_INTERACTIVE (argc == 1)
 #define IS_BATCH (argc == 2)
-#define MAX_TOKENS 1024
-#define DEBUG 1
+#define DEBUG 0
 
 #pragma region Function Prototypes and Globals
 
@@ -22,7 +21,7 @@ int builtin_cd(char **args);
 int builtin_pwd(char **args);
 int builtin_which(char **args);
 void builtin_exit(char **args);
-int is_builtin(char **line);
+int is_builtin(char **args);
 int is_valid_path(char *path);
 int exec_command(char **args, int argc);
 char **glob_eval(char **args);
@@ -123,6 +122,17 @@ char **process_line(char *line)
 
 int exec_command(char **args, int argc)
 {
+
+    // IF DEBUG, print initial exec command args:
+    if (DEBUG)
+    {
+        printf("Initial args: ");
+        for (int i = 0; args[i] != NULL; i++)
+        {
+            printf("%s ", args[i]);
+        }
+        printf("\n");
+    }
 
 #pragma region Shared Memory Stuff
 
@@ -249,7 +259,7 @@ int exec_command(char **args, int argc)
         // If output redirection symbol was found
         if (output_redirect_index != -1)
         {
-            printf("output redirect index: %d\n", output_redirect_index);
+            // printf("output redirect index: %d\n", output_redirect_index);
             // Ensure that the filename after the symbol is valid
             if (output_redirect_index + 1 < i && args[output_redirect_index + 1] != NULL)
             {
@@ -280,12 +290,31 @@ int exec_command(char **args, int argc)
             }
         }
 
+        // IF DEBUG: print arguments post-io processing
+        if (DEBUG)
+        {
+            printf("post-io processing args: ");
+            for (int i = 0; args[i] != NULL; i++)
+            {
+                printf("%s ", args[i]);
+            }
+            printf("\n");
+        }
+
+        // Recount the number of arguments
+        argc = 0;
+        while (args[argc] != NULL)
+        {
+            argc++;
+        }
+
         // Create new token array that only copies over non-nulls from original
         int writeIndex = 0;
         for (int readIndex = 0; readIndex < argc; readIndex++)
         {
             if (args[readIndex] != NULL)
             {
+                // printf("copying: %s\n", args[readIndex]);
                 args[writeIndex] = args[readIndex];
                 writeIndex++;
             }
@@ -377,6 +406,17 @@ char **glob_eval(char **args)
 
     // Free the original args array, but not the strings
     free(args);
+
+    // IF DEBUG: Print the new args
+    if (DEBUG)
+    {
+        printf("New args: ");
+        for (int i = 0; new_args[i] != NULL; i++)
+        {
+            printf("%s ", new_args[i]);
+        }
+        printf("\n");
+    }
 
     return new_args;
 }

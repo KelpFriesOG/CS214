@@ -1,1 +1,11 @@
-21
+/usr/bin/ls
+hello world
+I say heyoooooooooooooooo!
+
+Hello world,
+this is printing from
+within the meme.txt file.
+
+IF THIS WORKS WE'RE IN BUSINESS BABY
+!!!
+hello world
