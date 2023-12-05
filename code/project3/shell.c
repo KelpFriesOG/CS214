@@ -156,6 +156,7 @@ int exec_command(char **args, int argc)
 
         if ((*status = is_builtin(args)) == 0)
         {
+            printf("check builtin");
             // builtin_exit(args);
             return *status;
         }
@@ -282,16 +283,17 @@ int exec_command(char **args, int argc)
         // If the command is a builtin command, execute it and set status
         *status = is_builtin(args);
 
-        // If the command can execute successfully,
-        if (execvp(args[0], args) == 0)
+        if (*status == 1)
         {
+            // reset status
             *status = 0;
-            exit(EXIT_FAILURE);
         }
-        else
+
+        // If the command can't execute successfully,
+        if (execvp(args[0], args) < 0)
         {
             *status = 1;
-            perror("execvp: failed to execute command");
+            printf("failed to execute command: %s", args[0]);
             exit(EXIT_FAILURE);
         }
     }
@@ -771,6 +773,7 @@ int main(int argc, char *argv[])
                 // Handle non-pipe commands
                 if (tokens != NULL)
                 {
+                    printf("status : %d\n", status);
                     // If first token is "then" or "else" and status is 0 or not 0 respectively.
                     if ((strcmp(tokens[0], "then") == 0 && status == 0) ||
                         (strcmp(tokens[0], "else") == 0 && status != 0))

@@ -12,7 +12,7 @@
 #define IS_INTERACTIVE (argc == 1)
 #define IS_BATCH (argc == 2)
 #define MAX_TOKENS 1024
-#define DEBUG 0
+#define DEBUG 1
 
 #pragma region Function Prototypes and Globals
 
@@ -280,6 +280,21 @@ int exec_command(char **args, int argc)
             }
         }
 
+        // Create new token array that only copies over non-nulls from original
+        int writeIndex = 0;
+        for (int readIndex = 0; readIndex < argc; readIndex++)
+        {
+            if (args[readIndex] != NULL)
+            {
+                args[writeIndex] = args[readIndex];
+                writeIndex++;
+            }
+        }
+
+        argc = writeIndex;
+        // Add null at end
+        args[argc] = NULL;
+
 #pragma endregion
 
         // If the command is a builtin command, execute it and set status
@@ -287,11 +302,13 @@ int exec_command(char **args, int argc)
 
         // If the command can execute successfully,
 
-        if(*status == 1){
+        if (*status == 1)
+        {
             *status = 0;
         }
 
-        if(execvp(args[0],args) < 0){
+        if (execvp(args[0], args) < 0)
+        {
             *status = 1;
             printf("failed to execute command: %s\n", args[0]);
             exit(EXIT_FAILURE);
@@ -558,95 +575,90 @@ void execute_batch_file(FILE *fp)
     while (getline(&lineptr, &n, fp) != -1)
     {
 
-        
         if (lineptr[strlen(lineptr) - 1] == '\n')
         {
             lineptr[strlen(lineptr) - 1] = '\0';
         }
 
+        // Print line
+        // printf("%s\n", lineptr);
+
         char **tokens = process_line(lineptr);
-        
+
         // Count up the number of tokens
         int token_count = 0;
         while (tokens[token_count] != NULL)
         {
             token_count++;
         }
-        
-            int has_pipe = 0;
-            for (int i = 0; tokens && tokens[i] != NULL; i++)
-            {
-                if (strcmp(tokens[i], "|") == 0)
-                {
-                    has_pipe = 1;
-                    break;
-                }
-            }
 
-            
-            // Execute commands based on whether a pipe is present
-            if (has_pipe)
+        int has_pipe = 0;
+        for (int i = 0; tokens && tokens[i] != NULL; i++)
+        {
+            if (strcmp(tokens[i], "|") == 0)
             {
-                
+                has_pipe = 1;
+                break;
+            }
+        }
+
+        // Execute commands based on whether a pipe is present
+        if (has_pipe)
+        {
+
+            if ((strcmp(tokens[0], "then") == 0 && status == 0) ||
+                (strcmp(tokens[0], "else") == 0 && status != 0))
+            {
+                fix_then_else(tokens, token_count);
+                status = execute_pipe(tokens, token_count - 1);
+                continue;
+            }
+            else if (strcmp(tokens[0], "then") != 0 && (strcmp(tokens[0], "else") != 0))
+            {
+
+                // printf("\npre exec (not in then or else)\n");
+                status = execute_pipe(tokens, token_count);
+            }
+            else
+            {
+                continue;
+            }
+            // Execute the pipe command
+        }
+        else
+        {
+
+            // Handle non-pipe commands
+            if (tokens != NULL)
+            {
+
+                // If first token is "then" or "else" and status is 0 or not 0 respectively.
                 if ((strcmp(tokens[0], "then") == 0 && status == 0) ||
                     (strcmp(tokens[0], "else") == 0 && status != 0))
                 {
-                    fix_then_else(tokens,token_count);
-                    status = execute_pipe(tokens, token_count-1);
-                    continue;
+                    // printf("pre-tokens\n");
 
+                    // Copy over tokens into new arguments starting after the "then" or "else"
+
+                    fix_then_else(tokens, token_count);
+
+                    // printf("\npre exec\n");
+                    //  Execute the command
+                    status = exec_command(tokens, token_count - 1);
+                    continue;
                 }
                 else if (strcmp(tokens[0], "then") != 0 && (strcmp(tokens[0], "else") != 0))
                 {
-                    
-                    //printf("\npre exec (not in then or else)\n");
-                    status = execute_pipe(tokens, token_count);
+
+                    // printf("\npre exec (not in then or else)\n");
+                    status = exec_command(tokens, token_count);
                 }
                 else
                 {
                     continue;
                 }
-                // Execute the pipe command
-
-
             }
-            else
-            {
-
-                // Handle non-pipe commands
-                if (tokens != NULL)
-                {
-
-                    // If first token is "then" or "else" and status is 0 or not 0 respectively.
-                    if ((strcmp(tokens[0], "then") == 0 && status == 0) ||
-                        (strcmp(tokens[0], "else") == 0 && status != 0))
-                    {
-                        //printf("pre-tokens\n");
-
-
-                        // Copy over tokens into new arguments starting after the "then" or "else"
-
-                        fix_then_else(tokens,token_count);
-                        
-                        //printf("\npre exec\n");
-                        // Execute the command
-                        status = exec_command(tokens, token_count - 1);
-                        continue;
-                    }
-                    else if (strcmp(tokens[0], "then") != 0 && (strcmp(tokens[0], "else") != 0))
-                    {
-                        
-                        //printf("\npre exec (not in then or else)\n");
-                        status = exec_command(tokens, token_count);
-                    }
-                    else
-                    {
-                        continue;
-                    }
-                }
-
-            }
-        
+        }
     }
     free(lineptr);
 }
@@ -657,7 +669,7 @@ int execute_pipe(char **tokens, int argc)
     // Expand globs for the entire command line before splitting
     tokens = glob_eval(tokens);
 
-    #pragma region Shared Memory Stuff
+#pragma region Shared Memory Stuff
 
     key_t key = ftok("shared_memory_key", 1234); // Generate a unique key
     int id = shmget(key, sizeof(int), IPC_CREAT | 0666);
@@ -678,7 +690,7 @@ int execute_pipe(char **tokens, int argc)
     // Initialize status
     *status = 0;
 
-    #pragma endregion
+#pragma endregion
 
     // Check if there is any symbol following the cd command and see if its a pipe
     if (argc > 2 && strcmp(tokens[0], "cd") == 0)
@@ -726,7 +738,6 @@ int execute_pipe(char **tokens, int argc)
     char **left_args = tokens;
     char **right_args = &tokens[i + 1];
 
-
     int pipefd[2];
     pid_t pid1, pid2;
 
@@ -752,7 +763,8 @@ int execute_pipe(char **tokens, int argc)
         dup2(pipefd[1], STDOUT_FILENO);
         close(pipefd[0]);
         close(pipefd[1]);
-        if(execvp(left_args[0], left_args) < 0){
+        if (execvp(left_args[0], left_args) < 0)
+        {
             perror("execvp");
             *status = 1;
             printf("status in ex_pipe pid1 == 0 %d", *status);
@@ -776,7 +788,8 @@ int execute_pipe(char **tokens, int argc)
         dup2(pipefd[0], STDIN_FILENO);
         close(pipefd[1]);
         close(pipefd[0]);
-        if(execvp(right_args[0], right_args) < 0){
+        if (execvp(right_args[0], right_args) < 0)
+        {
             perror("execvp");
             printf("status in ex_pipe pid2 == 0 %d", *status);
             *status = 1;
@@ -793,9 +806,10 @@ int execute_pipe(char **tokens, int argc)
     return *status;
 }
 
-
-void fix_then_else(char **args, int count) {
-    if (count <= 1) {
+void fix_then_else(char **args, int count)
+{
+    if (count <= 1)
+    {
         return;
     }
 
@@ -803,14 +817,14 @@ void fix_then_else(char **args, int count) {
     free(args[0]);
 
     // Shift all elements to the left by one position
-    for (int i = 1; i < count; i++) {
+    for (int i = 1; i < count; i++)
+    {
         args[i - 1] = args[i];
     }
 
     // Set the last element to NULL
     args[count - 1] = NULL;
 }
-
 
 int main(int argc, char *argv[])
 {
@@ -822,7 +836,7 @@ int main(int argc, char *argv[])
     /* Check if the program is run in batch mode */
     if (IS_BATCH)
     {
-        
+
         FILE *fp = fopen(argv[1], "r");
         if (fp == NULL)
         {
@@ -851,7 +865,6 @@ int main(int argc, char *argv[])
             // Get user input
             getline(&lineptr, &n, stdin);
 
-
             // Remove trailing newline
             if (lineptr[strlen(lineptr) - 1] == '\n')
             {
@@ -879,23 +892,21 @@ int main(int argc, char *argv[])
                 }
             }
 
-            
             // Execute commands based on whether a pipe is present
             if (has_pipe)
             {
-                
+
                 if ((strcmp(tokens[0], "then") == 0 && status == 0) ||
                     (strcmp(tokens[0], "else") == 0 && status != 0))
                 {
-                    fix_then_else(tokens,token_count);
-                    status = execute_pipe(tokens, token_count-1);
+                    fix_then_else(tokens, token_count);
+                    status = execute_pipe(tokens, token_count - 1);
                     continue;
-
                 }
                 else if (strcmp(tokens[0], "then") != 0 && (strcmp(tokens[0], "else") != 0))
                 {
-                    
-                    //printf("\npre exec (not in then or else)\n");
+
+                    // printf("\npre exec (not in then or else)\n");
                     status = execute_pipe(tokens, token_count);
                 }
                 else
@@ -903,8 +914,6 @@ int main(int argc, char *argv[])
                     continue;
                 }
                 // Execute the pipe command
-
-
             }
             else
             {
@@ -917,22 +926,21 @@ int main(int argc, char *argv[])
                     if ((strcmp(tokens[0], "then") == 0 && status == 0) ||
                         (strcmp(tokens[0], "else") == 0 && status != 0))
                     {
-                        //printf("pre-tokens\n");
-
+                        // printf("pre-tokens\n");
 
                         // Copy over tokens into new arguments starting after the "then" or "else"
-                        
-                        fix_then_else(tokens,token_count);
 
-                        //printf("\npre exec\n");
-                        // Execute the command
+                        fix_then_else(tokens, token_count);
+
+                        // printf("\npre exec\n");
+                        //  Execute the command
                         status = exec_command(tokens, token_count - 1);
                         continue;
                     }
                     else if (strcmp(tokens[0], "then") != 0 && (strcmp(tokens[0], "else") != 0))
                     {
-                        
-                        //printf("\npre exec (not in then or else)\n");
+
+                        // printf("\npre exec (not in then or else)\n");
                         status = exec_command(tokens, token_count);
                     }
                     else
@@ -940,9 +948,8 @@ int main(int argc, char *argv[])
                         continue;
                     }
                 }
-
             }
-            
+
         } while (1);
 
         free(lineptr);
