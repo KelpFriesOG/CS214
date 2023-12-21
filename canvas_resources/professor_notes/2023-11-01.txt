@@ -1,0 +1,146 @@
+CS 214 / 2023-11-01
+===================
+
+Reminder: midterm will be Friday, Nov. 3, during class
+    you may bring up to 1 page of notes (handwritten)
+
+Project II notes
+----------------
+
+4 categories of characters
+- letters (always part of a word)
+- apostrophe (always part of a word)
+- hyphen (part of a word when between two letters)
+- everything else (never part of a word)
+
+
+
+Reading variable-length tokens from a file using read()
+problem: can't choose a buffer size one token long
+- token might be split between calls to read()
+- token might be longer than the buffer
+
+one approach:
+- fixed-sized buffer (array variable)
+- copy tokens to external string as we find them
+- handle split tokens by extending external string
+
+another approach
+- allocate buffer on heap
+- handle partial tokens by moving them to the start of the buffer
+    - next read() will write after the saved partial token
+- if token is too large, use realloc() to double the buffer length
+
+-> see lines/enum-nomalloc.c on Canvas
+
+
+directories
+-----------
+
+#include <dirent.h>
+
+opendir(), readdir(), closedir()
+
+#include <sys/stat.h>
+
+int stat(char *pathname, struct stat *sbuf);
+// returns 0 on success, -1 on failure (and sets errno)
+
+for details on stat:
+    man 2 stat
+    man 7 inode
+
+int fstat(int file_descriptor, struct stat *sbuf);
+
+
+symbolic links
+--------------
+
+aka "soft link"
+
+
+hard links connect a name to an inode
+    - names that hard link to the same inode are peers
+$ echo hello > foo
+$ ln foo bar
+$ rm foo
+$ cat bar
+hello
+
+symbolic links connect a name to another name
+    - a symbolic link is a special file that contains the
+      name of another file
+
+    - most accesses to a symbolic link will actually access the
+        named file
+        - we can use specific options with open() to ignore links
+        - we can use lstat() to get info about the link itself
+        
+$ echo hello > foo
+$ ln -s foo baz
+$ cat baz
+hello
+$ rm foo
+$ cat baz
+cat: baz: No such file or directory
+
+    baz still exists, but it is a broken link
+    
+$ echo goodbye > foo
+$ cat baz
+goodbye
+
+    baz links to the name foo, so creating a new file with that name
+    "fixes" the link
+
+
+processes
+---------
+
+a running program
+    (code + state)
+    
+we can change which program a process is executing
+
+int execl(char *path, ...)
+    arguments:
+        path to executable file
+        (multiple) arguments (strings)
+        NULL
+        
+    execl("my_program", "my_program", "arg1", "arg2", NULL);
+    
+    the current process stops executing the current program and
+    begins executing the specified program
+    -> all context of the current program is lost
+    
+    -> some process information carries over
+        - process id
+        - (most) open files
+        - environment variables
+        - some other data
+
+    execl() returns -1 on failure (and sets errno)
+    on success, execl() does not return
+    
+int execv(char *path, char **args);
+    specify path and array of arguments
+        last element of array must be NULL
+    
+
+
+pid_t fork(void);
+    duplicates the current process
+    fork "returns twice" 
+        - once in the original process (the parent)
+        - once in the new process (the child)
+        
+    fork returns 0 in the child
+    fork returns the pid of the child in the parent
+    
+pid_t wait(int *wstatus);
+    wait until a child process terminates
+    returns pid of the child that terminated
+    writes information about how the child terminated into wstatus
+        - did it terminate normally
+        - what was its exit status

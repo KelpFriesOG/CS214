@@ -1,0 +1,172 @@
+CS 214 / 2023-11-08
+===================
+
+Project II notes
+----------------
+
+components
+- data structure for word counts
+    increase_count(word)
+    extract_and_sort_words()
+- file reader/word scanner
+- directory traversal
+- main
+
+multitasking
+------------
+
+doing more than one thing with a computer
+- batch processing
+    a sequence of tasks performed one after the other
+    -> still seen today as shell scripts
+    
+- time sharing
+    CPU divides its time among multiple tasks
+        switches between processes while they run
+    - allows multiple users to interact with computer "simultaneously"
+    - allows CPU to keep busy while processes are blocked
+    
+time sharing is a form of "multitasking"
+another is "multiprocessing", when we have more than one CPU
+
+multitasking means multiple things happening "at once"
+    we don't have to wait for one process to end to begin the next
+    -> multiprocessing specifically allows things to happen literally
+        at the same time
+
+
+two kinds of time sharing
+- cooperative time sharing
+    one process is active at a time
+    if the active process blocks, another process becomes active
+    the active process can also voluntarily yield control
+        e.g., during a long computation, to avoid starving other processes
+
+- preemptive time sharing
+    one process is active at a time
+    if the active process blocks, another process becomes active
+    the OS will suspend the active process after some amount of time
+        to allow another process to become active
+    
+    the scheduler (part of the OS) determines which processes run next
+    and how much time each process gets
+        - simple schedulers give all processes roughly the same time
+        - more complex schedulers will consider priority
+        
+preemptive time sharing requires more OS/harware support
+but it is preferred, because it is less work for programs
+-> fairness is enforced by the scheduler
+-> no risk of a program monopolizing the CPU
+
+
+
+using multiple processes
+
+fork() creates a new process (initially a clone of the current process)
+
+int main()
+{
+    pid_t pid = fork();
+    
+    if (pid == 0) {
+        printf("We are the child.\n");
+    } else {
+        printf("We are the parent.\n");
+        wait(NULL);
+    }
+    
+    return EXIT_SUCCESS;
+}
+
+the child process has the same state (memory contents, program counter)
+as its parent
+except:
+    in the child, fork returns 0
+    in the parent, fork returns the PID of the child
+
+the parent and child execute concurrently
+the parent should call wait() at some point
+    calling wait will block a process until a child terminates
+    
+pid_t wait(int *wstatus);
+    wait() returns the PID of the child that terminated
+    providing wstatus allows us to learn how the child terminated
+        e.g., exited normally (with a status), killed by a signal, etc.
+    
+we should always call wait() (some time) after calling fork()
+- the OS keeps information about active processes
+- terminated processes remain in this table until their parent
+    calls wait()
+    
+    -> calling wait() is needed to clean up the process table
+
+a process that has terminated is called a "zombie"
+    calling wait is sometimes called "reaping"
+    
+if a parent process terminates before reaping its child,
+    the child process is called an "orphan"
+    
+a "zombie orphan" is a process that has terminated and whose parent
+has terminated without reaping
+
+to avoid cluttering the process table with zombie orphans, the OS
+will have special processes that "adopt" them (often init)
+-> so spawning zombies is not fatal, but it should still be avoided
+
+
+
+
+int main()
+{
+    fork();
+    fork();
+    fork();
+    fork();
+    
+    return EXIT_SUCCESS;
+}
+
+// how many processes are involved?   16
+// how many orphan zombies are created?  15
+
+// a simple "fork bomb"
+int main()
+{
+    while (1) fork();
+    
+    return EXIT_SUCCESS;
+}
+
+// running this will definitely cripple your OS
+
+
+
+why create child processes?
+- general multitasking
+    we might have two or more things to do that don't depend on each
+    other and want them to use the CPU as efficiently as possible
+    
+- allow child process to execute a different program
+
+    recall: execl() and execv()
+    these change the program of the current process
+    - most state (memory contents) is lost
+    - open files, PID, some other information is preserved
+    
+    
+exec() and fork() are usually used together
+
+pid_t child = fork();
+if (child == 0) {
+    // maybe some setup
+    execl(my_other_program, my_other_program, arg1, arg2, NULL);
+    // if we got here, then exec failed
+    // should report an error
+}
+//if we got here, we are in the parent
+int child_status;
+wait(&child_status);
+//once we get here, the child has terminated
+
+
+next time: dup() and pipe()

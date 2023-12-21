@@ -1,0 +1,268 @@
+CS 214 / 2023-09-15
+===================
+
+Office hours: Hill 448
+
+    Tuesday, 2:00 - 4:00 PM
+    Friday, 3:40 - 5:40 PM
+    
+Recitations next week!
+
+preprocessor directives
+-----------------------
+
+preprocessing occurs before compilation
+    tranforms C+CPP into C
+    
+    compiling with -E will preprocess and print the preprocessed code
+    
+#include
+    
+#define <macro_name> <expansion>
+
+#define MULITLINE if (x == y) { \
+    printf("They are the same!\n"); \
+}
+
+
+macros can have arguments
+
+#define SQUARE(X)  X * X
+
+    y = SQUARE(not_x);
+=>
+    y = not_x * not_x;
+
+no type checking (even in principle)
+    SQUARE("hello")
+=>
+    "hello" * "hello"
+    
+does not know about precedence or context
+    y = 1 / SQUARE(z);
+=>
+    y = 1 / z * z;
+
+    y = SQUARE(a + b);
+=>
+    y = a + b * a + b;
+    
+#define SQUARE(X) ((X) * (X))
+
+    y = 1 / SQUARE(a + b);
+=>
+    y = 1 / ((a + b) * (a + b));
+
+#define FOREACH(VAR, LENGTH) for (int VAR = 0; VAR < (LENGTH); VAR++)
+
+FOREACH(i, 20) {
+    // not actually that much more readable than a regular for loop
+}
+
+
+#ifdef <macro_name>
+
+.... C code and CPP directives to use when macro is defined...
+
+#else
+
+... alternate C code and directives to use when macro is not defined...
+
+#endif
+
+
+#ifndef <macro>
+... code to include if macro is not defined
+#endif
+
+#if <conditional>
+
+#else
+
+#endif
+
+
+useful trick:
+
+#ifndef DEBUG
+#define DEBUG 0
+#endif
+
+if (DEBUG) printf( ... some debugging info ... );
+
+
+by default, the debug prints will not be included in my compiled code
+
+If I compile with -DDEBUG, all my debugging code will be included
+
+gcc option -D<macro_name> adds the macro defined as 1
+gcc option -D<macro_name>=<text> adds the macro with the 
+    specified expansion
+
+Recommended use:
+    macros for constants (no "magic numbers")
+    macros for enabling/disabling debugging code
+
+    
+memory & pointers
+-----------------
+
+all of our data is kept in memory
+-> unique items in memory are called "objects"
+
+an object is a contiguous range of bytes used to store a single
+    data item
+    
+every variable has an associated object that stores its value
+
+every function has an object that stores its machine code
+
+many objects are not associated with a variable or name
+
+every object has an address / location
+
+    typically, every byte in memory is numbered
+    the object "begins" at the lowest-numbered byte in the object
+    that byte's address is also the address of the object
+    
+objects can be nested: an array object contains smaller objects for
+    its elements
+    
+to use an object, we need to know
+    (1) its location in memory
+    (2) its type (how to interpret bytes, how many bytes, etc.)
+    
+for variables, both the location and type are tracked by the compiler
+
+the unary & operator gives the address of a variable's object
+
+    int x;
+    
+    &x  -- evaluates to the address of x
+        -- obtains a "pointer to x"
+        
+pointer values in C are typed
+    the pointer type indicates the type of the specified object
+    
+        &x has type "int *"
+        
+    without the type information, we would not know how to read
+        or interpret the data
+
+a pointer variable stores a pointer
+
+    int *p;
+        // p stores a pointer to an integer
+    int* p = &x; 
+        // p stores the address of x
+
+    p = &x;
+        // stores the address of x in p
+
+
+    when declaring variables, we usually put the star on the variable name
+    --> the star only affects the next variable
+    
+    int* p, q;  // p is a pointer, q is not
+    int *p, *q;  // both p and q are pointers
+    
+
+the unary * "dereferences" a pointer
+
+    p by itself refers to the pointer variable
+    *p refers to the object p points to (e.g., x)
+    
+    *p = 1;  // same as x = 1
+    y = *p;  // same as y = x
+
+
+array names are (treated as) pointers   
+
+    char x[STRLEN];
+    
+    for (int i = 0; i < STRLEN; i++) {
+        x[i] = '\0';
+    }
+    
+    char *p, *q = p + STRLEN;
+    
+    for (p = x; p < q; p++) {
+        *p = '\0';
+    }
+    
+    
+    char s[] = "some string";
+    char d[STRLEN];
+    
+    char *p, *q;
+    
+    for (p = s, q = d;  *p != '\0'; p++, q++) {
+        *q = *p;
+    }
+    *q = '\0';
+    
+pointer arithmetic:
+    if p points to an object, p+1 points to the next object
+    
+    this only has meaning with respect to arrays
+    
+    array indexing is actually pointer arithmetic
+    
+    p[i] is the same as *(p + i)
+    
+    
+how do we define a linked list?
+
+struct list {
+    int data;
+    struct list *next;
+};
+
+
+using a pointer avoids a recursive definition
+allows us to use NULL to indicate "no more nodes"
+
+    NULL is a special pointer that never points to anything
+    
+we need a way to create an object that is not associated with a variable
+
+    malloc() is used for "dynamic allocation"
+        dynamic meaning the compiler doesn't need to know how much space
+        we need
+    
+    problem: how do we tell malloc() how many bytes we need?
+    - we can't pass a type
+    - we can't write a specialized malloc() for every type
+    
+    solution:
+    1. malloc() takes the number of bytes as an integer
+    2. use sizeof() to get the size of our objects
+    
+        sizeof(<type>) means the number of bytes needed to store
+            a value of that type
+            
+        sizeof(int)
+        sizeof(float)
+        sizeof(struct node)
+        
+    struct node *head = malloc(sizeof(struct node));
+    (*head).data = 0;
+    (*head).next = NULL;
+    
+    
+we can now create and use linked lists
+
+    for (p = head; p != NULL; p = (*p).next) {
+        // do stuff
+    }
+    
+how can malloc() return the correct type?
+    it cheats!
+    
+    malloc() returns "void *", an untyped pointer
+    
+    void pointers are automatically promoted to specific pointer types
+        -- be careful that your types match up!
+
+    double *foo = malloc(sizeof(int));
+        // this is an error, but the compiler can't/won't catch it

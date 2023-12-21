@@ -1,0 +1,279 @@
+CS 214 / 2023-10-06
+===================
+
+Function pointers
+-----------------
+
+Recall: program code (machine instructions) are stored in memory
+    -> thus, every function has an address
+    
+In C, we obtain the address of a function by writing its name
+
+    malloc
+        // without the () operator, this evaluates to the
+        // address of malloc in memory
+        
+    like array variables, these are read-only
+    
+we can create variables that store pointers to functions
+
+int foo(int);
+int bar(int);
+int baz(int);
+
+int (*ptr)(int);   // declaring ptr as a function pointer
+
+ptr = foo; // assigning the address of foo to ptr
+
+ptr(x);  // calls the function that ptr points
+
+
+typedef int (*inttoint)(int);
+    // declare inttoint as an alias for int (*)(int);
+
+inttonint ptr2 = bar;
+
+
+there are several situations where an algorithm is parameterized
+by a function
+
+e.g., sorting
+-> write one function for sorting an array
+    take the comparison function as a parameter
+    
+    
+void qsort(
+    void *base,             // pointer to array
+    size_t nmemb,           // length of the array
+    size_t size,            // size of array element
+    int (*compar)(const void *, const void *)
+                            // comparison function
+);
+
+
+int compare_ints(void *x, void *y)
+{
+    int a = *(int *)x;
+    int b = *(int *)y;
+    
+    if (a < b) return -1;
+    if (a == b) return 0;
+    return 1;
+}
+
+
+int big_array[ARRLEN];
+// initialize big_array
+
+qsort(big_array, ARRLEN, sizeof(int), compare_ints);
+
+char *strings[STRARRLEN];
+
+qsort(strings, STRARRLEN, sizeof(char *), strcmp);
+
+
+void bubblesort(
+    void *base,
+    size_t len,
+    size_t size,
+    int (*cmp)(void *, void *))
+{
+    char *scratch = malloc(size);
+    
+    for (int i = 0; i < len; i++) {
+        for (int j = 1; j < len; j++) {
+            char *prev = (char *)base + ((j-1) * size);
+            char *this = (char *)base + (j * size);
+            
+            if (cmp(prev, this) > 0) {
+                //*scratch = *prev;
+                memcpy(scratch, prev, size);
+                memcpy(prev, this, size);
+                memcpy(this, scratch, size);
+            }
+        }
+    }
+    
+    free(scratch);
+}
+
+
+
+// don't confuse these!
+
+int (*ptr)(int);  // defines a function pointer
+
+int *fun(int);    // function prototype (return type int *)
+
+
+
+
+    
+
+Useful Unix commands
+--------------------
+
+Files
+    every file is referred to by name
+        this includes special files like directories and links
+        
+    every file is located in a directory (folder)
+        -> a directory is a list of files
+
+    a path name uniquely identifies a file
+        a path name is a sequence of names separated by /
+        the last name is the file name
+        other names are the parent directories
+        
+        /user/my_name/214/mymalloc.c
+        
+        interpretation:
+            mymalloc.c is in 214
+            214 is in my_name
+            my_name is in user
+            user is in / (the root)
+
+        a path starting with the root is "absolute"
+        every absolute path name identifies (at most) one file
+        
+    we usually refer to files using "relative" path names
+        a relative path does not begin at the root
+        a relative path begins at some directory (the working directory)
+        
+    a name by itself (no slashes) refers to a file in the working
+        directory
+        
+    to name a file in a subdirectory of the working directory, use
+        slashes
+        
+        subdir/file
+        subdir/subsubdir/file
+        
+        
+    . means the working directory
+    .. means the parent of the working directory
+    
+    ./file  
+    ../file_in_parent
+    
+    ../../file_in_parent_of_parent
+    
+every process has a "current working directory"
+    file functions in C interpret paths relative to that directory
+    
+        open(), fopen(), etc.
+
+    C programs can query the current working directory with
+        getcwd()
+    
+    C programs can change their working directory with
+        chdir()
+    
+    changing the working directory can be useful if you are working
+    with several files in the same directory
+    
+shell sessions are processes, so they have current working directories
+    change using cd
+    view using pwd
+    
+    when we start a program, it inherits the working directory from
+        the shell
+
+
+wildcard file names
+
+    using * or ? in a file name indicates a "wildcard"
+    ? refers to a single character
+    * refers to zero or more characters
+    
+        *.c matches all files in the working directory whose names
+            end with ".c"
+        
+        foo*bar - all files that begin with foo and end with bar
+        
+        *baz* - all files that contain baz somewhere
+        
+        */*.c - all files in subdirectories that end with .c
+        
+        * works within a file name, so it can't expand into an
+        arbitrary path
+        
+        * will never include file names that start with .
+        
+        *   - all files not starting with .
+        .*  - all files starting with .
+
+    wildcards are handled by the shell
+        before the program you requested begins, the wildcard
+        is replaced with a space-separated list of names
+        
+    mv *.c foo
+    ->
+    mv alpha.c beta.c gamma.c foo
+    
+
+Useful commands
+
+    cd <path>
+        change working directory
+    pwd
+        print working directory
+    mv <src> <dest>
+        rename <src> to <dest>
+        possibly move it to a different directory
+        unless dest is an existing directory
+            -> in that case it moves src to that directory
+            
+        mv old_name new_name
+        mv old_name ../some_directory/new_name
+        my file_name destination_directory
+    
+    mv <variable number of files> <dest directory>
+        move all listed files to destination
+        
+    
+    cp
+        same arguments as mv, but it copies instead of moving
+        
+    rm <files>
+        removes (unlinks) files
+        cannot be undone! be careful!
+    
+    rm -r <directory>
+        recursively removes directories and files
+    
+    ls
+        lists files in the working directory
+    
+        ls -l
+            uses long format
+    
+        ls -t
+            sorts by time
+    
+        ls -r
+            reverses sorting
+    
+        options can be given separately or combined
+        ls -ltr
+    
+    ls <files>
+        lists specified files
+        
+        ls *.c *.h
+        ls -ltr *.c
+
+        if any files are directories, also lists their children
+        
+        ls -R <files>
+            recursively list subdirectory contents
+        
+        ls -d <files>
+            list directories as files, do not include their contents
+        
+            
+
+
+
+    
+        

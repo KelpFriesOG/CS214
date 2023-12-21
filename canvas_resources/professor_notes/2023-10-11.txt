@@ -1,0 +1,230 @@
+CS 214 / 2023-10-11
+===================
+
+Heap management
+---------------
+
+Relies on client code for memory safety
+    - client must not write outside the bounds of the memory it receives
+    - there is no way for the library or the compiler to enforce this
+    
+C has very limited memory protection
+- only the hardware can stop us from reading/writing to some address
+
+    most programs run in user mode
+    the OS can designate some regions of memory "off limits"
+    
+    library functions can switch the CPU to supervisor mode
+        -> absolute permission to do anything
+        
+malloc/free cannot rely on special codes or signals 
+    given an arbitrary pointer, we cannot tell whether the address
+    contains data or metadata just by checking the contents
+    -> client could coincidentally write data that looks like a header
+    
+mymalloc emphasizes safety
+    to check whether a pointer is pointing to the beginning of an object,
+    we can iterate through all the chunks and see if any match the pointer
+    
+    -> requires a linear traversal of the heap
+
+real malloc emphasizes speed
+    -> we call these functions frequently
+    -> C assumes no one ever makes mistakes
+
+speeding up malloc
+    -> don't look at allocated chunks
+    library maintains a "free list"
+    linked list containing all the free blocks
+        each free chunk starts with a pointer to the next free chunk
+        we can use the free payloads, because the client isn't using them
+    
+    further speedups
+        - use better data structures (sorted binary tree)
+        - use multiple free lists for different size ranges
+
+speeding up free
+    assume we got a good pointer
+    -> we can always move back the length of the header to see where
+        our chunk starts
+    -> header includes the chunk size, so we know where the next block
+        begins
+    -> but how can we tell where the previous chunk starts?
+        -> each chunk ends with a footer saying how big it is
+            use that to find the header for the previous chunk
+
+    we also have to update the free list
+        if we don't coalesce, we just add the chunk to the list
+        if we coalesce with one neighbor, we might leave the list as-is
+        if we coalesce with two neighbors, we have to remove the second
+            one from the free list
+        
+        -> we probably want a doubly-linked list 
+
+pre-splitting memory
+    divide the heap into regions used for different-sized allocations
+    -> attempt to minimize fragmentation
+
+
+handy tip for project one
+
+static double memory[MEMSIZE];
+
+#define heap ((char *)memory)
+
+now we can use byte offsets for pointer arithmetic
+
+int object_size = 256;
+char *object = heap + object_size;
+
+
+
+Making make make things
+-----------------------
+
+make <things to make>
+
+    make project
+    make test1 test2 test3
+    
+    make
+        - chooses first recipe in the Makefile
+        
+make -B <things>
+    forces recipes to be made (ignore up-to-dateness)
+
+make <variable>=<value> <things>
+    override variable definitions from the Makefile
+    
+    make CC=clang project
+
+
+A Makefile contains recipes (and variable definitions)
+
+
+VAR_NAME = SPACE SEPARATED VALUES
+
+CC = gcc
+CFLAGS = -g -Wall -std=c99
+TARGETS = foo bar baz
+
+
+target: dependencies (zero or more)
+	command (zero or more)
+	command
+	command
+	
+
+dependencies are used to determine whether a target is "up to date"
+
+a target is up to date if:
+    1. it exists
+    2. it is newer than its dependencies
+    3. the dependencies are up to date
+    
+	
+foo: foo.o
+
+foo.o: foo.c
+
+we need: foo newer than foo.o, foo.o newer than foo.c
+
+
+when make determines that a target is not up to date, it executes
+the recipe (starting from the leaves of the graph)
+	
+
+foo: foo.o
+	gcc foo.o -o foo
+
+foo.o: foo.c
+	gcc -c foo.c -o foo.o
+	
+	
+if there is no recipe for a dependency, then it is always up to date
+make will report an error if a dependency does not exist and has no recipe
+	
+
+a recipe with no dependencies will run, unless the target exists
+foo:
+	touch foo
+
+recipes that don't create a file with the name of the target will
+always run (unless something else creates the target)
+
+clean:
+	rm -f *.o foo
+	
+use of variables
+- save time
+
+foo.o: foo.c
+	gcc -Wall -g -otheroptions -flag2 -flag3 -c foo.c
+	
+	$(CC) $(CFLAGS) -c foo.c
+	
+- can override variables when calling make
+- make has some default rules
+    if we have a dependency foo.o with no rule, make will check whether
+    foo.c exists and assume this rule:
+	
+	foo.o: foo.c
+		$(CC) $(CFLAGS) -c foo.c
+		
+
+we can also define rules with wildcards
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+	
+useful variables
+
+    $@ current target name
+    $^ complete target dependency list
+    $< first target dependency
+	
+
+foo: foo.o bar.o baz.o
+	$(CC) $(CFLAGS) $^ -o $@
+	
+# we only want the first dependency here	
+foo.o: foo.c foo.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+
+# we can use blank recipes to add dependencies
+
+foo.o: foo.h
+
+foo.o bar.o baz.o: foo.h
+
+%.o: %.c
+	....
+	
+-----
+
+CC = gcc
+CFLAGS = -c -std=c99 -Wall -fsanitize=address,undefined
+
+all: program testprogram
+
+program: program.o lib1.o lib2.o
+	$(CC) $(CFLAGS) $^ -o $@
+	
+testprogram: testprogram.o lib1.o lib2debug.o
+	$(CC) $(CFLAGS) $^ -o $@
+	
+lib1.o lib2.o program.o testprogram.o: lib1.h lib2.h
+
+# this is just the default rule, we don't actually need it
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+	
+lib2debug.o: lib2.c lib2.h
+	$(CC) $(CFLAGS) -DDEBUG -c $< -o $@
+	
+test: testprogram
+	./testprogram
+	
+clean:
+	rm -f *.o testprogram program

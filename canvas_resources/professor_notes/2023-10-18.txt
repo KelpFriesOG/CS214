@@ -1,0 +1,245 @@
+CS 214 / 2023-10-18
+===================
+
+Project I notes
+---------------
+
+Error messages should note the file name and line number
+-> ideally describe what was wrong
+
+mymalloc() should return NULL
+
+you have a choice for free()
+after printing the error message you can:
+    - do nothing and return
+    - halt the program by calling exit()
+    
+in your README, note which choice you made and why
+
+
+int *p = malloc(0);
+if (p == NULL) {
+    ok
+} else {
+    not ok
+    exit(1);
+    *p = 4;
+}
+
+--
+CC = gcc
+CFLAGS = -g -std=c99 -Wall -fsanitize=address,undefined
+
+all: memgrind memtest
+
+memgrind: memgrind.o mymalloc.o
+	$(CC) $(CFLAGS) $^ -o $@
+
+memtest: memtest.o mymalloc.o
+	$(CC) $(CFLAGS) $^ -o $@
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+	
+memgrind.o memtest.o mymalloc.o: mymalloc.h
+
+test: memtest
+	./memtest
+
+clean:
+	rm -f *.o memtest memgrind
+
+---
+
+
+File IO
+-------
+
+Files exist on disk/in storage/non-volatile memory
+
+the Unix model generalizes the concept of file
+    the file access model can be used for many things
+    
+    - files on disk
+    - input from the console
+    - output to the console
+    - input/output from a network
+    - input/output from other programs
+    - input/output from arbitrary devices
+    
+we use the file model for anything we can model as a stream of bytes
+    either input or output
+    a "full duplex" stream has both input and output
+    
+
+We have two groups of file functions
+    - C provides buffered file access
+        - FILE *
+        - fopen(), fclose(), fread(), fwrite(), fscanf(), fprintf()
+        - FILE *stdin, *stdout, *stderr;
+
+    - Posix provides low-level non-buffered functions
+        - file descriptors (int)
+        - open(), close(), read(), write(), lseek(), ...
+        - 0, 1, 2 (STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO)
+        
+
+Buffering
+- reading/writing files requires the OS (a system call)
+    - system calls are expensive, compared to normal functions
+    - we don't want to make a system call for each byte we read/write
+    
+- buffering allows us to combine multiple requests into one
+    - instead of requesting 100 bytes one at a time, get them all at once
+    - instead of writing bytes one at a time, collect them and send
+        them together
+        
+the FILE struct includes a buffer and a cursor within the buffer
+    when reading, we use a system call to fill the buffer
+    subsequent requests read from the buffer until it is empty
+    the next request will refill the buffer
+    
+    when writing, we write bytes into the buffer
+    when the buffer is full*, we send it to the OS and clear the buffer
+        (this is called flushing the buffer)
+    subsequent writes will gradually refill the buffer
+    
+        *three buffering strategies
+            - regular files will wait until the buffer is full to send data
+            - stdout is "line buffered"; we flush once we write \n
+            - stderr flushes after each write function
+            
+        fflush() flushes the FILE's buffer
+    
+the non-buffered functions use a buffer provided by the caller
+
+ssize_t   // returns the number of bytes that were written
+write(
+    int fd,    // descriptor for the file we are writing to
+    void *buf, // pointer to buffer containing bytes to write
+    size_t bytes  // number of bytes to write
+);
+    
+on error, write() returns -1 and sets errno
+    
+    perror(string)  - prints an error message in the format,
+        <your text>: <description of errno>
+        
+    strerror(error_number) returns a string describing the error number
+        
+
+
+ssize_t     // number of bytes written to the buffer
+            // 0 if at end of file
+read(int fildes,   // descriptor of file to read from
+   void *buf,       // address to write bytes to
+   size_t nbyte // length of buffer
+);
+
+on error, read() returns -1 and sets errno
+
+#define BUFSIZE 128
+
+{ 
+
+    char *buf[BUFSIZE];
+    int bytes;
+    
+    bytes = read(STDIN_FILENO, buf, BUFSIZE);
+    if (bytes < 0) {
+        perror("input");
+        exit(EXIT_FAILURE);
+    }
+    if (bytes == 0) {
+        // end of file
+    }
+    
+    printf("Buffer contains %d bytes\n", bytes);
+
+}
+
+
+{
+    char *buf[BUFSIZE];
+    int bytes;
+    
+    bytes = read(fd, buf, BUFSIZE);
+    while (bytes > 0) {
+        for (i = 0; i < bytes; i++) {
+            do something with buf[i]
+        }
+        
+        bytes = read(fd, buf, BUFSIZE);
+    }
+
+}
+
+{
+    char *buf[BUFSIZE];
+    int bytes;
+    
+    while (1) {
+        bytes = read(fd, buf, BUFSIZE);
+        if (bytes < 0) break;
+        
+        for (i = 0; i < bytes; i++) {
+            do something with buf[i]
+        }
+        
+    }
+}
+
+{
+    char *buf[BUFSIZE];
+    int bytes;
+    
+    while (0 < (bytes = read(fd, buf, BUFSIZE))) {      
+        for (i = 0; i < bytes; i++) {
+            do something with buf[i]
+        }
+    }
+}
+
+
+int     // returns a file descriptor on success
+        // returns -1 and sets errno on failure
+open(
+    char *path,
+    int flags,
+    ...
+)
+
+flags is a bit-vector describing how we want to use the file
+
+    O_RDONLY    - open file for reading
+    O_WRONLY    - open file for writing
+    O_RDRW      - open file for reading and writing
+
+    O_CREAT     - create file if it does not already exists ***
+    O_TRUNC     - set file length to 0 if it already exists
+    O_APPEND    - writes happen at the end of the file
+
+
+outfile = open(my_output_file_path, O_WRONLY|O_CREAT|O_TRUNC, permissions)
+
+infile = open(my_input_file_path, O_RDONLY);
+if (infile == -1) {
+    perror(my_input_file_path);
+    do something...
+}
+
+
+File permissions
+----------------
+
+every file has an owner and a group
+
+we can separately set read/write/execute permissions for a file's owner,
+group, and others
+
+each permission is a bit, so we have three groups of three bits
+
+    u  g  o
+    rwxrwxrwx
+    110100100  = 0644
+    111000000  = 0700

@@ -1,0 +1,181 @@
+CS 214 / 2023-11-17
+===================
+
+prog < foo
+cat foo | prog
+
+
+which ls > some_file
+
+
+prog > foo > bar
+
+
+signals
+-------
+
+mechanism for communicating with a running process
+
+each signal type is identified by a number
+    there is a set of standard signals (see man 7 signal)
+    
+for each signal type, we can set a disposition
+- ignore
+- terminate
+- terminate and dump core
+- stop
+- continue
+- call a function (signal handler)
+
+
+a signal handler takes an int (the signal number)
+
+void handler(int signo) {
+    // do safe things
+}
+
+{ 
+    signal(SIGWHATEVER, handler); // installs a handler for this signal
+
+}
+
+
+signal() returns the old disposition, allowing it to be restored
+later
+
+what can we do within a signal handler?
+-> we can't do everything
+-> some actions/functions are not safe
+
+e.g., printf() is not safe within a signal handler
+
+
+functions like printf() have a state that they update
+    (contents of the buffer, file position, buffer position, etc)
+    during the call, this state may become briefly inconsistent
+    -> fine, as long as it is restored before printf() returns
+    
+what if we get a signal during printf()?
+if the signal handler tries to call printf(), the "reentrant" call
+    may see the inconsistent state of the FILE record
+    
+only functions that are reentrant (or signal safe) can be called within
+a signal handler
+
+    man 7 signal-safety
+    -> lists all async-signal-safe functions
+    
+as a rule, you don't want to do a lot of work within a signal handler
+-> as the handler lasts longer, you increase the chances of getting
+   another signal
+   
+   your handler probably isn't itself safe to interrupt
+   
+historically, there are two ways to deal with receiving a signal while
+    already handling the same signal
+
+1. just allow it: interrupt the handler and call the handler again
+2. temporarily disable the signal type while the handler is executing
+
+signal() has used both strategies, depending on which Unix-like OS
+you were using
+    for backwards (in)compatability, POSIX allows both behaviors
+    
+for this reason, signal() is only truly portable when setting a
+disposition to SIG_IGN
+
+sigaction() is the truly safe and portable way to set signal handlers
+
+-> allows you to specify whether some signals are blocked in the handler
+
+
+blocking signals
+----------------
+
+blocking a signal type prevents signals of that type from being delivered
+
+-> "delivering" a signal will do whatever the disposition says
+    (terminate process, call handler, do nothing, etc.)
+    
+blocked signals are not ignored, they are just held for later ("pending")
+
+if we later unblock the signal type, any pending signals will be
+delivered
+
+
+blocking/unblocking signals allows us to temporarily ensure that we
+do not receive incoming signals without losing them
+-> any signals sent while they are blocked will be delivered once
+   the process unblocks
+
+
+the "signal mask" for a process indicates which signals are blocked
+
+signal masks and dispositions are inherited by child processes
+-> but calling exec() can reset these
+
+
+what happens if a signal arrives while the process is blocked?
+e.g., a signal arrives when scanf() or read() is waiting for input
+
+two possibilities:
+    - resume waiting
+    - return immediately and note that a signal arrived
+
+depending on how the file is configured, read() may return -1
+and set errno to EINTR if a signal is received before any data is read
+
+    we can use fcntl() to configure whether reads from a file should
+    be interruptible or should resume after a signal arrives
+
+
+
+    
+
+example code
+------------
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+
+volatile int signo = 0;
+
+void handle(int signum)
+{
+    signo = signum;
+}
+
+int main()
+{
+    struct sigaction new, old;
+    new.sa_handler = handle;
+    sigemptyset(&new.sa_mask);
+    new.sa_flags = 0;
+
+    sigaction(SIGINT, &new, &old);
+    sigaction(SIGHUP, &new, NULL);
+    sigaction(SIGTERM, &new, NULL);
+
+
+    printf("PID %d\n", getpid());
+
+
+    char buf[256];
+    int bytes = read(0, buf, 256);
+   
+    printf("bytes = %d\n", bytes);
+    if (bytes < 0) {
+        perror("read");
+    }
+
+    if (signo) psignal(signo, "read");
+
+
+    return EXIT_SUCCESS;
+}
+
+
+
+

@@ -1,0 +1,60 @@
+CS 214 / 2023-12-06
+===================
+
+recap
+-----
+
+pthread_t
+pthread_create
+pthread_join
+
+pthread_mutex_t - mutual exclusion
+pthread_mutex_init
+pthread_mutex_lock
+pthread_mutex_unlock
+
+pthread_cond_t - condition variables
+pthread_cond_init
+pthread_cond_wait
+pthread_cond_signal
+pthread_cond_broadcast
+
+
+thread-safe bounded queue
+    two primary operations: enqueue and dequeue
+    use of mutex to ensure sequential access to internal data
+    
+    if one thread attempts to en/dequeue while another thread has
+    access, it blocks until the thread with current access is done
+    
+unresolved issues:
+    what to do if enqueue or dequeue will fail because the queue is
+        full or empty, respectively?
+
+    we could just keep trying until success: "busy waiting"
+    
+condition variables
+    allows us to block a thread until some condition changes
+            i.e., block enqueue until the queue is no longer full
+            
+pthread_cond_wait  - blocks the thread
+
+pthread_cond_signal  - unblock one thread waiting for this condition
+
+pthread_cond_broadcast - unblock all threads waiting for this condition
+
+
+
+I have uploaded an expanded version of the queue code to Canvas
+under Files -> Source Code
+
+Please download it and experiment!
+
+Exercise: replace constants with parameters read from the command-line
+    (e.g., number of producers/consumers, delays, etc.)
+
+Exercise: what is needed if the producers and consumers each
+produce/consume a finite number of items, but their totals do
+not necessarily match? How can you guarantee termination?
+
+

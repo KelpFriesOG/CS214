@@ -1,0 +1,225 @@
+CS 214 / 2023-11-22
+===================
+
+Project III notes
+-----------------
+
+detect and report error for syntax errors in the command line
+
+    command |   <- no command given after pipe
+    cmd < >     <- redirect followed by non-name token
+    cd with zero or 2+ arguments -> print message to stderr
+    pwd generally ignores any arguments
+    which may search for all names it is given, or just the first
+        -> reports error status for built-ins and non-found programs
+
+prog1 < foo | prog2 
+
+    prog1 input comes from foo
+    prog1 output goes to prog2
+
+prog1 > foo | prog2
+    prog1 output goes to foo
+    prog2 input is empty
+
+multitasking
+------------
+
+why?
+    - allows CPU to keep busy while waiting for IO
+        (background tasks)
+    - divide a large computation among multiple CPUs
+    
+
+we can use fork()/wait() to run multiple processes
+- useful for running tasks in the background, less so for division of labor
+
+-> communication between concurrent processes is limited
+    - child can report exit status back to parent (one byte)
+    - parent can set initial conditions for the child
+    - parent and child can send each other signals (one number)
+    - communication via pipes and shared files on disk
+    
+alternative: run two or more tasks with shared memory
+-> multithreading
+
+a thread is a task running within a process
+    each thread has a stack/registers/program counter
+    
+    all threads share the heap/global data/program code
+    
+advantage: shared memory makes communication much easier
+    all the threads share heap/globals, so changes by one thread
+    are visible to the others
+    
+disadvantage: all the threads share heap/globals
+    -> without coordination, updates to shared memory can lead to
+        inconsistent data structures or lost information
+        
+
+
+creating a thread
+-----------------
+
+POSIX thread library (pthread)
+
+to use pthreads, we need to give gcc the option -pthread
+
+    gcc ... -pthread myprogram.c
+    
+    #include <pthread.h>
+    
+int pthread_create(
+    pthread_t *thread,   // output: ID of new thread will be written here
+    const pthread_attr_t *attr,
+                        // used to set thread options
+                        // or NULL for default options
+    void *(*start_routine) (void *),
+                        // function that the thread will execute
+    void *arg
+                        // argument for the thread function
+);
+    
+we pass a pointer to a function that takes a void * and returns a void *
+
+returns 0 on success, and an error code on failure
+
+
+int pthread_join(
+    pthread_t thread,  // ID of the thread to join
+    void **retval      // place to store the void * returned by the thread
+                       // or NULL to discard the returned pointer
+);
+    blocks until the specified thread has completed
+    retrieves the pointer returned from the thread function
+
+void *execute_task(void *);
+...
+
+{
+    task_t tasks[4] = ...;
+    pthread_t tids[4];
+    void *returns[4];
+
+    for (i = 0; i < 4; i++) {
+        error = pthread_create(&tids[i], NULL, execute_task, &tasks[i]);
+        if (error) { ... }
+    }
+    
+    // all threads are executing
+    
+    for (i = 0; i < 4; i++) {
+        pthread_join(tids[i], &returns[i]);
+    }
+    
+    // all threads have completed
+}
+
+
+similar roles:
+    fork()   pthread_create()
+    
+    wait()   pthread_join()
+    
+
+major differences:
+    fork() creates a child process
+    pthread_create() starts a thread in the current process
+    
+    child process decides what to do after fork() returns
+    pthread_create() specifies what code the thread will execute
+    
+    wait() obtains an exit status from child process
+    pthread_join() gets a pointer
+    
+
+    processes have a strict parent/child hierarchy
+        parent always waits for child
+        
+    threads are all peers
+        one thread creates another, but after that there is no distinction
+        any thread can join any other thread
+
+a process with multiple threads continues running until
+    - all threads have completed
+    - any thread calls exit()
+    
+
+void pthread_exit(void *retval);
+
+    terminates the current thread
+    return value is stored in case some other thread calls join
+    behaves like returning from the thread function
+
+
+
+
+implementation of threading
+---------------------------
+
+kernel/OS threads
+    -> default for pthread
+    
+    OS is aware of thread, schedules it like a task
+    starting more threads potentially gets more time slices
+    OS can schedules threads on different CPUs
+    
+library/"green" threads
+    implemented by run-time system of program itself
+    typically less overhead than OS threads
+    requires OS support to take advantage of multiple CPUs
+    
+
+
+next week: coordination between threads
+
+
+
+----
+// remember to compile with -pthread
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <pthread.h>
+
+void *print_numbers(void *arg)
+{
+    int i;
+    int me = *(int *)arg;
+
+    printf("Thread %d started\n", me);
+
+    for (i = 0; i < 5; i++) {
+        printf("%d: %d\n", me, i);
+        sleep(1);
+    }
+
+    return NULL;
+}
+
+#define THREADS 4
+
+int main()
+{
+    pthread_t tids[THREADS];
+    int info[THREADS];
+    int i;
+
+    for (i = 0; i < THREADS; i++) {
+        info[i] = i;
+        pthread_create(&tids[i], NULL, print_numbers, &info[i]);
+    }
+
+    printf("All threads started\n");
+
+    // exit(EXIT_SUCCESS);
+    // pthread_exit(NULL);
+
+    for (i = 0; i < THREADS; i++) {
+        pthread_join(tids[i], NULL);
+    }
+
+    printf("All threads finished\n");
+
+    return EXIT_SUCCESS;
+}

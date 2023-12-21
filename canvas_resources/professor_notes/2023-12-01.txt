@@ -1,0 +1,74 @@
+CS 214 / 2023-12-01
+===================
+
+program1 argument1 argument2 | program2 etc etc
+
+pwd > file
+
+which > file
+
+these should all work
+pwd | foo
+foo | pwd
+foo > file | pwd
+
+this should do something, but what is up to you
+cd somewhere | echo hello
+
+should "fail":    true | false
+should "succeed": false | true
+
+
+
+
+circular queue
+--------------
+
+operations:
+    enqueue - add item to queue (unless full)
+    dequeue - remove item from queue (unless empty)
+    
+    bounded length
+    "circular" because we use an array
+    
+implementation
+    array of items
+    length - number of items in queue
+    head - index of the oldest item in the queue
+    
+
+problem:
+    what do we do when we try to enqueue/dequeue and the queue is full/empty?
+
+    we might want to fail, but what do we do after?
+    
+    just calling enqueue repeatedly, we waste CPU time
+        ("busy wait")
+    
+we want a way to pause the thread until the condition changes
+    -> the queue becomes non-full/non-empty
+
+
+
+condition variable
+------------------
+
+
+pthread_cond_t   - abstract struct
+
+int pthread_cond_init(
+    pthread_cond_t *cond,     // condition variable to initialize
+    pthread_condattr_t *attr  // settings
+);
+
+
+
+int pthread_cond_wait(
+    pthread_cond_t *cond,   // condition variable to wait for
+    pthread_mutex_t *lock    // mutex associated with the condition
+);
+    releases the lock, waits for a signal, reacquires the lock
+    
+int pthread_cond_signal(pthread_cond_t *cond);
+    wakes up one thread waiting for the condition
+    

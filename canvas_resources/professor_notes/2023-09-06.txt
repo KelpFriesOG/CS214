@@ -1,0 +1,160 @@
+CS 214 / 2023-09-06
+===================
+
+CS 214 Systems Programming
+
+Prof. David Menendez
+    davemm@cs.rutgers.edu
+    Hill 448
+        Office hours schedule TBA
+        Most likely Tuesday and Friday afternoons
+        Drop by! I get very lonely
+
+Canvas site is active
+-> these notes will be posted there after class
+
+What is this class?
+-------------------
+
+Project-heavy class
+    "Big" programming assignments
+    2-person group assignments
+        -> group work may be unfamiliar
+        -> but you will need to get good at it
+            most programming is group programming
+            writing clear, understandable code is important!
+            
+    advice for working in a group
+        communicate!
+        make a plan, divide responsibilities
+            
+
+We will also have written exams
+
+We will be using the Instructional Lab (iLab) as our
+    reference hardware/OS platform
+    
+    physically located on the Hill Annex second floor
+    -> you can log in in person or remotely
+
+    you should already have an account
+        same user name as your NetID
+        potentially different password
+        
+    -> you may need to activate it
+
+
+Ask questions!
+    the discussions tab in Canvas is there for that
+    just raise your hand during lecture
+
+
+What do we mean by "Systems Programming"?
+
+    low-level interactions between programs and 
+        hardware/operating system
+        
+    specifically: 
+        C Programming Language
+        Unix/Linux/Posix API
+
+Topics
+    C Programming
+    Posix OS calls
+        File IO
+        Directory handling
+        Creating processes/Multitasking
+    Multithreading (PThreads)
+    Network communication (Sockets)
+
+
+
+What is the C Programming Language?
+-----------------------------------
+
+How is C different from Java?
+ 
+    In a Java environment
+        write Java source code
+        javac ("Java compiler") translates source to "byte code"
+        Java byte code are binary instructions for the
+            Java Virtual Machine
+            
+        a JVM program (java) interprets the byte code
+            java is a machine-language executable
+
+    In a C environment,
+        write C source code
+        compiler (gcc, cc, icc, etc.) translates source
+            to machine language
+    
+You can write your program in any text editor
+
+Compile with gcc (or your favorite compiler)
+
+Recommended options/flags for GCC
+
+    -g     - include debugging information
+    -Wall  - enable warnings
+    -Werror   - treat all warnings as errors (if you like)
+    -fsanitize=address
+        - enables address sanitizer (ASan)
+    -fsanitize=undefined
+        - enables undefined behavior sanitizer (UBSan)
+    
+        -fsanitize=address,undefined
+
+
+
+More differences:
+
+    local variables are uninitialized by default
+    
+Integer types
+
+    signed/unsigned long/short int
+    
+    signed vs unsigned - do we allow negative numbers
+    
+    integer sizes
+        short int, at least 2 bytes
+        int, at least as many bytes as a short 
+            and no more than a long
+        long int, at least 4 bytes
+        
+        
+    char  - 1 byte integer
+    
+        char x = 97;
+        int a = 'a';
+        
+        chars can be signed or unsigned
+            "char" by itself might mean either
+
+    float, double
+    
+    no bool!
+        we use integers
+            0 is false
+            not-zero is true
+    
+    no strings type!
+        we do have string values
+        (more on that later)
+
+
+---- hello.c ----
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+int main(int argc, char **argv)
+{
+
+    int n = 0;
+
+    printf("Hello, world!\n");
+    printf("The secret number is %x\n", n);
+
+    return EXIT_SUCCESS;
+}

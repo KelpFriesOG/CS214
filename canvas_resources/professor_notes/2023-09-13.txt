@@ -1,0 +1,309 @@
+CS 214 / 2023-09-13
+===================
+
+No recitation today; probably no recitation on Friday
+Please look for an announcement via Canvas
+
+Currently targeting next Wednesday for first project
+
+recap
+-----
+
+C types:
+    numbers (int, float, double, enum)
+    arrays
+        -> have element type and dimension
+        -> that information is not stored at run-time!
+
+structures
+----------
+
+collection of values possibly of different types
+elements are accessed by name
+-> each structure type has a fixed number/type of elements
+
+
+struct structure_name {
+    field_type field_name;
+    field_type2 field_name2;
+    ...
+};
+
+struct point {
+    double x;
+    double y;
+};
+
+struct point my_location;
+
+struct point my_destination = { 11, -4 };
+    // initializes my_destination.x == 11 and my_destination.y == -4
+
+struct point partial_point = { 25 };
+    // initializes partial_point.x = 25, but leaves y uninitialized
+    // allowed, but not something you normally do
+
+use . and a field name to access fields
+
+my_location.x = 0;
+int x_distance = my_location.x * my_location.x;
+
+
+struct rectangle {
+    struct point topleft;
+    double width, height;
+};
+
+struct rectangle r = { { 1, 2}, 3, 4 }; 
+r.topleft.x = 0;
+
+the compiler determines the layout of a struct
+-> fields are always in the order declared
+-> no other data is included
+-> the compiler may insert padding between fields
+
+struct variables are allocated like primitive types
+
+    global structs behave like global variables
+        -> exist entire time program runs
+        -> cannot be created or destroyed while running
+    local structs behave like local variables
+        -> created when function begins
+        -> destroyed when function exits
+
+
+structs that are fields of other structs are stored directly
+    in the larger struct
+
+
+arrays can live in structs
+
+struct record {
+    char name[200];
+    other whatever;
+    ...
+};
+
+// when declared like this, the array is part of the struct
+
+structs can live in arrays
+
+struct point vertices[10];
+    // array containing 10 points
+    
+vertices[0].x
+
+struct shape {
+    struct point vertices[10];
+    enum color background;
+    ...
+};
+
+struct shape list[10];
+
+list[4].vertices[8].x = 0;
+
+
+unions
+------
+
+a structure is like a Cartesian product of its fields
+a union is like a union of its fields
+
+union int_or_float {
+    int i;
+    float f;
+};
+    // has enough space to store any of its elements/variants
+    // but only one at a time
+    
+    
+union int_or_float foo;
+
+foo.i = 24;
+foo.f = 1.1;
+    // since all the variants are stored using the same bytes,
+    // the second assignment overwrites the first
+    
+no information is kept saying which variant the union contains!
+-> you must remember from context which variant is active
+    (or store that information separately)
+    
+why unions?
+
+1. save space
+    - maybe we have two variables that are never used at the same time
+        (nowadays we would rely on the compiler to optimize space)
+
+2. combine variants of a struct
+    (nowadays we might use subclasses instead)
+    
+
+foo.i = 20;
+printf("%f\n", foo.f);
+    // this is undefined!
+    // we might expect to just interpret the integer's bytes as a float
+    // that is probably what will happen, but not guaranteed
+
+
+summary:
+    structs are AND
+    unions are OR
+    
+    unions are niche and you will rarely need them
+
+typedef
+-------
+
+used to create a new name for a type
+
+typedef some_existing_type new_name;
+
+typedef struct point my_point;
+
+struct point p1;
+my_point p1;
+    // these mean the same thing
+    
+    
+typedef double vector[3];
+    // dimension goes with the name, just as with variable declarations
+
+double vec[3];
+vector vec;
+    // these mean the same thing
+
+vector matrix[3];
+    matrix is a 3*3 array of doubles
+
+we can declare a struct/enum/union inside a typedef
+
+
+typedef struct point_s {
+    double x, y;
+} point_t;
+
+    struct point_s and point_t both mean the same type
+
+structs can be anonymous
+
+typedef struct {
+    double x, y;
+} point_t;
+
+
+typedef has no run-time impact
+typedef does not affect type checking
+
+-> typedef is purely for convenience and readability
+
+
+one note: types created by typedef don't exist until after the typedef
+
+typedef struct node_s {
+    int data;
+    struct node_s *next;
+} node_t;
+
+
+
+headers & CPP
+-------------
+
+
+A typical C source file contains two kinds of programs
+    1. C code
+    2. "preprocessor directives"
+    
+The C Pre-Processor is a stage of compilation that modifies our
+    C source code according to various directives
+    
+directives are lines that begin with #
+
+#include <file>
+#include "file"
+
+    copies contents of specified file into the current source file
+        <file> means the file is in the "standard include" directory
+        "file" means the file is in the working directory
+    
+    usually used to include "header files"
+    -> a header file contains declarations
+        (functions, types, global variables, more preprocessor stuff)
+    -> usually end in .h
+        
+        
+declaration vs definition
+
+    declaration says that something exists
+        gives it a name, type information, etc
+    
+    definition says what something is
+        code for function, allocation for global variable
+        definitions implicitly declare
+        
+to access a function or variable, it must be declared earlier in the
+    same file
+    
+    problem: mutual recursion
+    solution: forward declaration using prototypes
+    
+
+void foo(int);  // declares foo
+
+void bar(int x)
+{
+    foo(x);
+}
+
+void foo(int x)
+{
+    bar(x);
+}
+
+
+always, we use functions that are declared outside our source file
+    standard library functions like printf() are not defined in
+        our source
+
+    in order to use these, they must be declared
+        files like stdio.h and stdlib.h contain function prototypes
+        -> actual source is separate and already compiled
+        
+
+#define name replacement
+
+    often called "macros"
+    directs preprocessor to replace "name" with "replacement"
+        respects token boundaries (will not replace "names")
+        respects string literals (will not replace "string with name")
+        
+    name is a single token made of letters, digits, and _
+    convention is to use all caps, but not required
+
+#define STRING_LENGTH 100
+
+    directs preprocessor to replace STRING_LENGTH with 100
+        (except in string literals)
+
+
+    char string[STRING_LENGTH];
+    
+    for (int i = 0; i < STRING_LENGTH; i++) { ... }
+    
+    
+#define POSITIVE > 0
+
+    if (p POSITIVE) { ... }
+    
+    
+#define SQUARE(X)  ((X) * (X))
+
+
+int y = SQUARE(x);
+-> will be replaced by
+    int y = ((x) * (x));
+    
+int z = SQUARE(a+b);
+
+    int z = ((a+b)*(a+b));

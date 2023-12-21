@@ -1,0 +1,302 @@
+CS 214 / 2023-11-29
+===================
+
+Final Exam:
+    December 20, 8:00 AM - 11:00 AM
+    On-line via Canvas :(
+        Exam will be available until
+        December 21, 8:00 AM
+
+Project III is extended to Dec. 4
+
+
+multithreading
+--------------
+
+idea: multiple tasks within a single process
+    - each thread has its own stack and program counter
+    
+    - threads share memory (esp. globals and the heap)
+    
+shared memory greatly simplifies communication between threads
+shared memory is the greatest source of bugs and confusing behavior
+
+-> we need some way to coordinate access to shared data
+
+
+example: we have an integer shared between two threads
+    this integer stores a count of something
+    both threads would like to increment this integer
+    
+    
+    thread A            thread B
+    
+    count++;            count++;
+    
+let's say count is initially 0
+both threads increment count
+what is the value of count?
+
+    probably 2, but possibly 1?
+    
+problem: incrementing a global variable is "non-atomic"
+    there are multiple steps:
+        1. get the current value of the global (store in a register)
+        2. compute value+1 (still in a register)
+        3. write updated value to memory
+
+possible scenario 1:
+
+    thread A                thread B
+    --------                --------
+    
+    read count
+        obtain 0
+    increment value (1)
+    write 1 to count
+    
+                            read count (get 1)
+                            increment value (2)
+                            write 2 to count
+
+possible scenario 2:
+
+    thread A                thread B
+    --------                --------
+    
+    
+                            read count (get 0)
+                            increment value (1)
+                            write 1 to count
+
+    read count (get 1)
+    increment value (2)
+    write 2 to count
+
+
+possible scenario 3:
+
+    thread A                thread B
+    --------                --------
+    
+                            read count (get 0)
+                            increment value (1)
+
+    read count (get 0)
+    increment value (1)
+    write 1 to count
+
+                            write 1 to count
+
+
+because the increment is non-atomic, threads can interfere with
+each other; data based on old reads can get written to memory
+    -> one increment can be lost
+    
+any time multiple threads can write to a shared memory location,
+we have the potential for non-deterministic behavior
+
+
+how do we avoid this problem?
+- transactions
+    - before we write to memory, we make sure the value already there
+      is the one we expect
+- enforce single-thread access (mutual exclusion)
+    - essentially, make the operation atomic
+    - while one thread has access to the shared value, no other thread
+        can read or write it
+
+
+but how can we enforce single-thread access?
+
+we could put a bit in memory saying whether the data is in use
+    before we increment count, we check whether the bit is clear
+    
+    while (in_use != 0)  /* do nothing */;
+    in_use = 1;
+    count++;
+    in_use = 0;
+
+    but this has the same problem as before!
+    checking the bit and setting it to 0 are two distinct operations
+    another thread could read the bit before we are able to update it
+    
+it turns out, there is no software solution
+-> we need hardware support
+
+
+there are a few atomic instructions we could use
+one is "test-and-set"
+
+    test and set is given a memory location, a value to write,
+        and a value that is expected to be there
+        
+    in one step, we write the value to memory only if the expected
+        value is present
+        -> we can then check whether we succeeded
+        
+this is atomic, because the CPU makes it atomic
+
+    this lets us combine checking if in_use == 0 and setting in_use = 1
+    into a single atomic operation
+    -> any other check of in_use will be before or after ours
+    
+using this, we can enforce mutual exclusion
+-> well, not actually "enforce"
+    nothing stops another thread from just writing to in_use regardless
+    of its value
+-> this gives us the ability to coordinate access, but it is up to us
+    to do the coordination correctly
+
+
+how do we access this functionality?
+    C does not have atomic test-and-set operations
+    we, or a library, will need to resort to machine instructions
+
+
+mutex
+-----
+
+The Pthread library provides a data structure and functions that we
+can use to coordinate mutual exclusion: the mutex
+
+pthread_mutex_t mut;
+    // corresponds to our "in_use" bit
+
+int pthread_mutex_init(
+    pthread_mutex_t *mutex,     // mutex object we are initializing
+    pthread_mutexattr_t *attr); // describe features we are using
+                                // (or NULL for default settings)
+
+
+
+int pthread_mutex_lock(pthread_mutex_t *mutex);
+    // obtain exclusive access to this mutex
+    // if another thread has access, block until they are done
+
+int pthread_mutex_unlock(pthread_mutex_t *mutex);
+    // release exclusive access
+    // if other threads are blocked, wake one of them up
+
+
+    thread 0
+    --------
+    // global variables: count, lock
+    
+    pthread_mutex_init(&lock, NULL);
+    pthread_create(...thread A...)
+    pthread_create(... thread B ...)
+    
+    
+    threads A and B
+    ---------------
+    pthread_mutex_lock(&mut);
+    count++;
+    pthread_mutex_unlock(&mut);
+
+
+the lock effectively makes the access atomic
+    either A updates count before B, or B before A
+    scenario 3 cannot occur
+    
+the mutex is more complex than a simple in_use bit:
+    it has a queue of threads that are waiting for the mutex
+    when a thread tries to lock a locked mutex, it is removed from
+        the schedule and added to the mutex's queue
+        when the current lock holder unlocks the mutex, the first
+        thread in the queue is rescheduled
+
+
+a rule for mutexes:
+    we already know that only one thread can lock the mutex at a time
+    only the thread that has locked the mutex can unlock it
+    
+what stops a thread that does not hold the lock from calling
+    pthread_mutex_unlock()?
+    
+    your good sense!
+
+by default, we use "fast mutexes", which do not check whether the
+thread calling unlock is the thread that locked the mutex
+
+we can request an "error checking" mutex, which will fail if the
+thread calling unlock is not the thread that locked the mutex
+
+-> however, such a check should never be needed
+    if you are calling unlock in a situation where it is possible that
+    you don't hold the lock, your code already has problems
+    
+    ideally, lock and unlock should be in the same function and
+    you should not hold a lock for a long period of time
+    
+
+strategy for using mutexes:
+design thread-safe data structures
+access data through accessor functions
+    accessor functions are responsible for obtaining/releasing locks
+
+
+typedef struct {
+    pthread_mutex_t lock;
+    int count;
+} counter_t;
+
+
+void increment(counter_t *counter)
+{
+    pthread_mutex_lock(&counter->lock);
+    counter->count++;
+    pthread_mutex_unlock(&counter->lock);
+}
+
+increment is a thread-safe function
+    calls to increment are "synchronized"
+    effectively, an atomic increment function
+
+
+
+what stops a thread from modifying count without getting the lock?
+-> nothing!
+-> it is your responsibility to enforce your access rules
+
+
+
+void increase(counter_t *counter, int amount);
+void decrease(counter_t *counter, int amount);
+int current_count(counter_t *counter);
+
+
+    thread A
+    --------
+    
+    if (current_count(my_amount) > 5) {
+        decrease(my_amount, 5);
+    } else {
+        // something else
+    }
+
+
+this is unsafe again!
+    between current_count and decrease, another thread could 
+    also decrease the count!
+    
+we can't combine atomic functions to get new atomic operations
+-> if we want "decrease if above some threshold", we have to
+    provide it as a single operation
+
+    int decrease_if_above(counter_t *count, int amount, int threshold)
+    {
+        int success = 0; 
+        pthread_mutex_lock(&counter->lock);
+            if (counter->count > threshold) {
+                counter->count -= amount;
+                success = 1;
+            }
+        pthread_mutex_unlock(&counter->lock);
+        
+        return success;
+    }
+
+next time: what if we wanted to block until the count exceeded the
+    threshold?
+    can we implement that efficiently?

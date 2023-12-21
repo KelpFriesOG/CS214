@@ -1,0 +1,206 @@
+CS 214 / 2023-11-15
+===================
+
+Project III
+-----------
+
+Building a small command-line shell
+
+Features:
+- start programs with arguments, and obtain exit status
+- input and output redirection
+            > foo   in the command line means stdout will be foo
+            < foo   in the command line means stdin will be foo
+- piping
+    arg0 arg1 arg2 | argA argB argC
+    
+- wildcards
+        before*after
+        ls *.c
+        echo *.c
+        
+        path/to/some/file*name
+
+- Conditional execution: then, else
+
+    mysh> make program
+    mysh> then ./program
+
+    mysh> some_program
+    mysh> else echo Oh no!
+
+
+
+Major components:
+    command-line parser
+        wildcard expansion
+    program launcher
+        create child process
+        change stdin/stdout in child
+        gather exit status
+
+
+Reminder: execv()
+
+    int execv(char *exec_path, char **args)
+    
+    cp foo bar baz
+    
+    execv("/usr/bin/cp", {"cp", "foo", "bar", "baz", NULL})
+
+
+program name
+    paths - any token containing /
+        pass path directly to execv
+    
+    bare name - token does not contain /
+        look for a file by this name in these directories
+            /usr/local/bin
+            /usr/bin
+            /bin
+
+        use access() to determine whether a file exists
+    
+    built-ins: cd, pwd, which
+        cd <directory>
+            changes working directory (in the shell)
+            chdir()
+            
+        pwd
+            prints working directory to stdout
+            getcwd()
+        
+        which <program_name>
+            prints the path for this program
+
+        exit
+            terminates the shell
+        
+recommended structure for command-line parser
+
+tokenizer
+    repeatedly call read() to get input text
+    break input into tokens
+    creates a "job order" describing the process to launch
+        argument list
+        input redirect (if any)
+        output redirect (if any)
+        path to executable
+        
+        note: you will need one of these per process to launch
+            e.g., a pipeline will have at least 2
+
+
+
+interrupts
+----------
+
+hardware method to pause the currently executing task to deal
+with some immediate issue
+
+when an interrupt occurs, the CPU will switch to executing an
+"interrupt handler", which is some specialized code placed in
+known locations by the OS
+
+examples of interrupts:
+- timers
+    OS can set a timer to trigger an interrupt after some interval
+    used for many things, such as preemptive multitasking
+        interrupt handler will save current task context, set
+        a new timer, and restore the context of another task
+
+- IO activity
+    e.g., data arriving from network, input devices, etc.
+    typically, the handler will store the data in a buffer somewhere
+
+- CPU-level error conditions (traps)
+    executing an invalid instruction
+    arithmetic errors, e.g., division by zero
+    disallowed memory accesses
+
+
+signals
+-------
+
+mechanism for asynchronous communication between processes
+
+signals are messages that can be sent to a process
+    these messages are integers with designated meanings
+        the mapping of number to meaning varies, so we usually refer
+        to these by name
+        
+    examples: SIGINT, SIGTERM, SIGKILL, SIGSTOP, SIGCONTINUE, SIGFPE, etc.
+    
+any process can send a signal to another process
+
+every process sets "signal dispositions"
+for each signal type, the disposition says what to do
+
+- ignore
+- stop (allowing us to continue later)
+- terminate
+- terminate and dump core (for debugging, maybe)
+- call a signal handler
+
+signal handler is a function that is called when a signal arrives
+as far as the CPU is concerned, it is just a normal function that
+got called unexpectedly;
+    it has a frame added to the stack
+    if it returns, it will resume whatever was happening when the
+        signal arrived
+
+every signal has a default disposition
+we can override this by using signal() or sigaction()
+
+
+common signals for ending a process
+    SIGINT   - sent when user types control-C
+    SIGTERM  - sent by kill command (by default)
+    SIGKILL  - terminates program without recourse (kill -KILL)
+    SIGHUP   - sent when user logs out ("hangs up")
+    SIGABRT  - sent by abort() within a process
+
+
+you can install handlers for these (except SIGKILL) and change
+what will happen when they arrive
+
+some signal handlers should not resume
+    SIGILL  - "illegal instruction"
+    SIGFPE  - floating-point exception
+
+    these arise while executing an instruction
+    if a handler returned normally, it would re-execute the instruction
+    -> leading to the same error and signal!
+
+instead of terminating, you can use setjmp() and longjmp() to act
+as exception handlers
+
+man 7 signal    - lots of information about signals
+man 2 signal    - description of signal()
+
+#include <signal.h>
+
+typedef void (*sighandler_t)(int);
+
+    sighandler_t is a pointer to a void function that takes an int
+    
+sighandler_t signal(int signum, sighandler_t handler);
+
+two constants of type sighandler_t
+    SIG_IGN   - ignore signal disposition
+    SIG_DFL   - default disposition for this signal
+    
+signal() returns the previous disposition
+
+
+
+signal(SIGINT, SIG_IGN);
+    // changes disposition for SIGINT to ignore
+    
+signal(SIGINT, some_function)
+    // changes disposition for SIGINT to call the some_function()
+
+
+the signal handler will be called with the signal number when the
+signal is received
+

@@ -1,0 +1,128 @@
+CS 214 / 2023-10-27
+===================
+
+
+Midterm Exam
+------------
+
+Friday, Nov 3, in class (this classroom, 2:00 PM - 3:20 PM)
+
+you may bring one (single-sided) page of notes
+they are unlikely to help you
+
+C programming
+    - general syntax
+        - preprocessor, use of #include
+    - standard library
+    - helpful tools: gcc, make, man
+        -> man (the manual) is divided into sections
+            POSIX functions are in section 2
+            C standard functions are in section 3
+    - declarations and definitions
+            extern int global_var;
+    - preprocessing vs compiling vs linking
+    - types
+        - char, int (various), float, double
+        - struct, union, enum
+        - arrays
+        - pointers
+        - sizeof()
+                int a[5], *p = a;
+                sizeof(a) == 5 * sizeof(int)
+                sizeof(p) == sizeof(int *)
+                sizeof(*p) == sizeof(int)
+    - macros
+        - macro expansion
+        - considerations when defining macros with arguments
+        
+                #define SQUARE(X)  ((X) * (X))
+                SQUARE(x++)
+                ((x++) * (x++))
+                SQUARE(time_consuming_function())
+                
+        - checking macro expansion with gcc -E
+        - use of \ to continue definitions
+
+Memory 
+    - understanding all data as collections of bytes
+    - pointer vs "pointee"
+    - pointer types and pointer arithmetic
+    - object location vs object content
+        int a;   a vs &a 
+        int *p;  p vs *p vs &p
+    - use of malloc(), realloc(), and free()
+        int *p = malloc(...);
+        int *q = p;
+        p = realloc(p, ...)
+        *q   /// potentially use-after-free
+
+Posix File IO
+    - open(), close(), read(), write()
+    - use of buffers
+    - opendir(), readdir(), closedir()
+
+File system
+    - inode block vs data block
+    - directory files
+    - "linking" files
+        -> can a file have more than one name?
+        -> can a directory be linked more than once?
+
+
+Using directories
+-----------------
+
+a directory is a file containing directory entries
+    each directory entry has (at least)
+        a name
+        an inode number
+    it may also include
+        file type
+            regular file (contains data)
+            directory
+            soft link
+            block device
+            named pipes/FIFO
+        
+#include <dirent.h>
+
+DIR *opendir(char *pathname);
+    returns a pointer to an abstract struct
+    or NULL on failure
+
+struct dirent *readdir(DIR *directory_pointer);
+
+    returns a pointer to a directory entry structure
+    --> this may be overwritten the next time we call readdir()
+    --> do not free()
+    
+    entries are not returned in any particular order
+    
+    
+    struct dirent {
+        ino_t  d_ino;   // the inode number for the entry
+        char[] d_name;  // the name (NULL-terminated string)
+        
+    // not guaranteed to exist
+        unsigned char d_type;  // the file type
+    }
+
+
+int closedir(DIR *directory_pointer);
+    closes the directory
+    returns 0 on success, -1 on failure (and sets errno)
+
+
+
+.
+|
++ input.txt
+|
++ foo
+  |
+  + input.txt
+  
+  
+
+
+

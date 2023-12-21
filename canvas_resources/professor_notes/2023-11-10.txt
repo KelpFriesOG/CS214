@@ -1,0 +1,145 @@
+CS 214 / 2023-11-10
+===================
+
+typically, we use fork(), exec(), and wait() in combination
+- fork() creates a child process
+- exec() changes the child process's program
+- wait() pauses parent until child has terminated/reaps zombie
+
+#include <sys/wait.h>
+pid_t wait(int *wstatus);
+
+    returns the PID of the child that terminated
+        - if the child has already terminated, it returns immediately
+        - if the child has not terminated, it blocks until the child
+          terminates
+        - if more than one child has already terminated, no order is
+          assumed
+    
+    technically, wait() waits for a child to "change state"
+        this includes terminating, but also stopping and resuming
+
+to tell what happened, check the value written to wstate
+- wstate will contain a bit vector; we can use macros to extract the info
+
+
+    WIFEXITED(wstatus)  - true if the process exited normally
+    WEXITSTATUS(wstatus) - contains the exit status when the process
+                            exited normally
+    
+    WIFSIGNALED(wstatus) - true if the process terminated after
+                            being signalled 
+    WTERMSIG(wstatus) - the signal that lead to termination
+    
+    WIFSTOPPED(wstatus) - true if process has stopped (e.g., paused)
+    WIFCONTINUED(wstatus) - true if stopped process has been unpaused
+    
+
+communication between parent and child
+--------------------------------------
+
+we have seen that exit() and wait() can send one byte from the child
+    to the parent
+    
+we can use exec() to pass strings from the parent to the child
+we can also store some data in the environment
+open files can be passed to a subprocess
+
+
+int pipe(int fd[2]);
+    returns 0 on success, -1 on failure (and sets errno)
+    
+    creates a single "pipe" with two ends
+        each end has a file descriptor
+        read end will be in fd[1]
+        write end will be in fd[0]
+
+int fd[2];
+int r = pipe(fd);
+
+we can create the before calling fork
+    one process writes to the pipe
+    one process will read from the pipe
+    
+
+
+idea:
+    we want to run a program in our child process
+    that program writes to stdout (fd 1)
+    
+    we want the parent to receive the child process's output
+    we can create a pipe, but how can we tell the child to write to it?
+    
+    
+int dup(int);
+    creates a new file descriptor for an open file
+    -> this is a duplicate; the two descriptors can be used interchangeably
+
+note that duplicate file descriptors must both be closed to close the file
+that is, an open file description is kept as long as at least one
+    file descriptor remains unclosed
+
+int dup2(int oldfd, int newfd);
+    like dup(), but we specify the file descriptor for the duplicate
+    -> if that descriptor is already in use, it is closed
+    
+int fd[2];
+pipe(fd); // creates our pipe
+
+if (fork() == 0) {
+    dup2(fd[1], STDOUT_FILENO);
+    // optional:
+    close(fd[0]);
+    close(fd[1]);
+    
+    // if this succeeds, all subsequent writes to stdout will go to the pipe
+    
+    execl(...);
+    // if we got here, something is wrong
+}
+close(fd[1]);
+// if we don't close the write end in the parent, we will never get EOF
+
+// now the parent can read the child's output from fd[0]
+while ((bytes = read(fd[0], buf, AMOUNT)) > 0) {
+    // obtain data from child process
+}
+
+wait(NULL);
+
+
+we can use pipe() and dup2() to establish communication between parent
+and child using the child's stdin, stdout, and/or stderr
+
+
+// input redirection
+if (fork() == 0) {
+    int fd = open(some_file, O_RDONLY);
+    dup2(fd, STDIN_FILENO);
+    execl(some_program, ..., NULL);
+    
+}
+
+// opening two processes and establishing a pipe
+int fd[2];
+pipe(fd);
+
+if (fork() == 0) {
+    // first child
+    dup2(fd[1], STDOUT_FILENO);
+    execl(first_program, ..., NULL);
+    exit(1);
+}
+close(fd[1]);
+if (fork() == 0) {
+    // second child
+    dup2(fd[0], STDIN_FILENO);
+    execl(second_program, ..., NULL);
+    exit(1);
+}
+
+
+
+
+    
+}

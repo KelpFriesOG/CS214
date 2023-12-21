@@ -1,0 +1,258 @@
+CS 214 / 2023-09-27
+===================
+
+recap: structs, dynamic memory
+------------------------------
+
+three regions of memory
+- static / global area
+    objects that live the entire lifetime of the process
+    global variables, program instructions
+- stack
+    stack frames tied to function execution
+    local variables, run-time function data tracking
+    individual stack frames have pre-determined size
+    overall size of stack is dynamic
+- heap
+    all other data (not tied to a variable)
+    in C, explicitly requested (malloc) and released (free)
+
+
+void *malloc(size_t bytes);
+
+    parameter: size (in bytes) of object to allocate
+        compute using sizeof() and math
+    
+    returns a pointer to the newly allocated object
+        uses void *, because that is a generic pointer
+        void * automatically promotes/demotes to other pointer types
+        
+        compiler does not check that we cast void * to the "correct" type
+        make sure our size request and our pointer type are consistent
+        
+        
+        double *p = malloc(sizeof(int));
+            // wrong, but compiler won't see the problem
+            // (we probably didn't request enough bytes)
+
+    returns NULL if malloc failed
+        will never happen under normal circumstances
+        you should still check
+
+void free(void *object);
+
+    tells the run-time system to deallocate the specified object
+    that is, mark the space no longer in use
+    
+    can only be used with objects allocated by malloc!
+    
+    
+    do not attempt:
+        int x;
+        free(&x);   // don't free a local/global variable
+    
+    
+        int *p = malloc(sizeof(int) * 100);
+        free(&p[99]);  // don't free part of an object
+
+        
+        int *p = malloc(...);
+        free(p);
+        free(p);    // don't free something twice
+
+        int *p = malloc(sizeof(int));
+        *p = 5;
+        free(p);
+        printf("%d\n", *p);  // don't use after freeing
+
+    
+    int *p, *q;
+    
+    p = (int *)malloc(sizeof(int));
+    q = p;
+        // *p and *q both refer to the same integer in memory
+    *q = 5;
+    (*p)++;
+        // *q == 6 == *p
+
+    free(q);   // is this allowed? yes!
+        // the object q points to was allocated using malloc()
+    
+    *p = 0;  // is this allowed? no!
+        // the object p points to was just freed
+    
+    free(p); // is this allowed?  no!
+        // this is just a double-free in disguise
+        
+    don't confuse a pointer variable with the object it points to
+    
+
+arrow syntax for fields:
+
+shorthand for accessing fields of a struct using a pointer
+
+struct node {
+    data_t data;
+    struct node *next;
+};
+
+struct node *p = ....;
+
+p.data   // not allowed, because p is a pointer
+
+*p.data  // not allowed, because it means *(p.data)
+
+        struct node h;
+        *h.next.data = ...  // okay
+
+(*p).data  // allowed: accesses field of dereferenced pointer
+
+shorthand:
+
+    p->data   // accesses field of dereferenced pointer
+
+recall:
+    use s.f  when s has a struct type
+    use p->f when p has a pointer type
+    
+can be chained: head->next->next->data
+
+
+
+more useful functions
+---------------------
+
+void *calloc(size_t nmemb, size_t size);
+
+    like malloc(), but:
+    1. all bytes in new object are set to zero
+    2. we provide separate element size and count
+    
+    malloc(20 * sizeof(int)); // allocate space for 20 ints
+    calloc(20, sizeof(int));  // allocate space for 20 ints, cleared
+
+    in general, malloc(m) is the same size as calloc(1, m)
+
+    calloc() ensures that you won't read uninitialized data
+        (assuming zero is a value that makes sense)
+    
+    if you're going to immediately write to your new object, then
+    the extra time initializing in calloc() is wasted
+
+
+void *realloc(void *ptr, size_t size);
+    (pretends to) resize a previously allocated object
+    
+    if we allocated an array that was too big/small, we can adjust its size
+
+    calling it with a larger size has one of two effects:
+    - if our object is followed by free space, it expands our allocation
+    - otherwise, it allocates a new object, copies our data, and frees
+        the original
+    
+    returns NULL if insufficient free space
+        
+    int *p = malloc(100 * sizeof(int));
+    ...
+    p = realloc(p, 200 * sizeof(int));
+        // p potentially points to a new array
+    
+    we should always assume that realloc() moves our object!
+    - any old pointers to our object must be updated
+    
+    int *p, *q;
+    p = (int *)malloc(100 * sizeof(int));
+    q = p;
+    
+    p = realloc(p, 200 * sizeof(int));
+        // we must assume that q is a bad pointer
+        // to be correct, we would need to update both
+
+    when using realloc(), make sure there are no dangling references to
+    the "old" location
+
+void *memcpy(void *dest, const void *src, size_t n);
+    #include <string.h>
+    
+    copies a specified number of bytes from *src to *dest
+    
+    int *p, *q;
+    p = (int *)malloc(100 * sizeof(int));
+    q = (int *)malloc(100 * sizeof(int));
+    ....
+    memcpy(q, p, 50 * sizeof(int));
+        // copies p[0] through p[49] to q[0] through q[49]
+
+    note the order: destination first, just like q = p
+
+    memcpy(q + 50, p + 10, 50 * sizeof(int));
+        // copies p[10] through p[59] to q[50] through q[99]
+        // -> source and destination can be any stretch of memory,
+        //    not just complete objects
+        
+    does not allocate space!
+        destination must already be allocated and be large enough to
+        hold copied data
+
+    source and destination regions must be disjoint
+    that is, there can be no overlap
+
+void *memmove(void *dest, const void *src, size_t n);
+    #include <string.h>
+    
+    works the same as memcpy(), but allows *src and *dest to overlap
+    -> more general
+    -> potentially slower
+    
+    
+    example: moving elements in an array
+    
+    int a[400];
+    
+    memmove(a, a+1, 399 * sizeof(int));
+        // moves all the elements of a one index earlier
+
+    trying to use memcpy() here results in unpredictable behavior
+
+char *strcpy(char *dest, const char *src);
+    
+    copies a string from src to dest
+    instead of specifying the size, we let the string determine its length
+    strcpy() copies from src until it finds a terminator
+    
+    similar effect to using strlen() and memcpy()
+    
+    src and dest cannot overlap
+    dest must be large enough to store the string + terminator
+    
+char *strncpy(char *dest, const char *src, size_t n);
+
+    size-limited version of strcpy()
+    copies from src to dest until it finds a terminator or copies n bytes
+    
+    ensures that at most n bytes written to dest
+    
+    (beware: if strncpy() runs out of bytes, it won't write a terminator
+    to dest)
+
+    use case for strncpy() is questionable
+    - can potentially leave an unterminated string in dest
+    - if you aren't sure about the sizes, you should check before copying
+    
+    
+typical scenario for copying strings
+
+    char buf[BUFSIZE];
+    char *p;
+    
+    .... obtain a string in buf, want to make a copy
+    int l = strlen(buf);
+    p = malloc(l + 1);  // allocate minimum space to store string
+    memcpy(p, buf, l + 1); // copy string + terminator to p
+    
+    
+    
+strcat
+
+strcmp
+memcmp

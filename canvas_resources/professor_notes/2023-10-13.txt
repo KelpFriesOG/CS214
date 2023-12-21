@@ -1,0 +1,180 @@
+CS 214 / 2023-10-13
+===================
+
+Recommended compiler options
+
+    -g  enables debugging information (for gdb, ASan)
+    
+    -Wall   enables most useful warnings
+    
+        optional: -Werror    treat warnings as errors
+        optional: -Wvla      warn for variable length arrays
+        
+    -std=c89    specify that we want C 1989/1990 standard
+    -std=c99    specify that we want C 1999 standard
+    
+    -fsanitize=address      activate address sanitizer (ASan)
+    -fsanitize=undefined    activate undefined behavior sanitizer (UBSan)
+
+        -fsanitize=address,undefined
+
+
+
+Job control and the shell
+-------------------------
+
+a shell is the general interface to the computer
+    the program you run when you're not running a specific program
+    the program you use to say which program you want to use
+    
+we are interested in command-line shells
+    more expressive than a GUI
+    essentially a programming language (shell scripts)
+    
+shells are just programs
+    sh (Bourne shell)
+    bash (Bourne-again shell)
+    csh
+    tcsh
+    zsh
+    fish
+
+
+we use the command line to specify jobs to execute and coordinate jobs
+    job: one or more processes that are working together for some purpose
+        (process group)
+    
+    process: a program being executed
+        program + state
+
+start jobs by entering commands into the shell
+    (command name) (arguments...)
+    
+    cp some_file some_directory 
+        using a "bare name" for a program tells the shell to look in
+            the "usual places"
+
+        the shell has a "search path", which is a list of directories
+        it checks each directory for the specified program in order
+            the first one found will be used
+            error if nothing is found
+        typically, the working directory is not included
+        
+    echo $PATH
+        prints the shell's search path
+
+    which name
+        says which program will be run for this name
+
+    if the name includes a /, we treat it as a path and do not search
+    
+        ./program
+        p1/memgrind
+        
+
+the shell does some processing on the command
+    wildcards are replaced by a space-separated list of matching files
+    
+            ls foo.*
+        might get processed into
+            ls foo.c foo.o foo.h
+
+        - even the command name can be expanded
+            if I have a program in the current directory with a long name
+            I can just write ./long*
+        
+    if an argument begins with ~, the ~ is replaced by the user's home path
+            
+we can escape spaces and punctuation using \
+
+    vim file\ name\ with\ spaces.txt
+    the shell will treat this as two words and remove the backslashes
+
+we can use quotes to escape spaces/punctuation
+
+    vim "file name with spaces.txt"
+    vim "don't use apostrophes in file names.txt"
+
+    vim 'why would you put "quotes" in a file name?.txt'
+        
+    single quotes are stronger than double quotes
+        echo "this $PATH is expanded"
+        echo 'this $PATH is not expanded'
+
+    quotes do not delimit words; they can occur anywhere in a word
+        echo text"with middle"quotes
+        textwith middlequotes
+    
+        'single quoted string'"'"'s good time'
+
+In Unix, we have three standard files
+    input:  stdin
+    output: stdout, stderr
+
+normally, these are inherited from the parent process
+    e.g., when running a process from a shell, a program will have the
+        same input/output as the shell (the console)
+
+we can use the command line to specify these files
+
+     program < input_file
+        specifies that program should use input_file for stdin
+        i.e., scanf() will read from input_file, not the console
+     
+     program > output_file
+        specifies that program should use output_file for stdout
+     
+     program 2> errors
+        program should use errors for file #2 (stderr)
+        
+     we can combine these
+     
+        program < inf > outf 2> errf
+    
+        they do not have to be in any order
+    
+    redirects are removed from the command line before executing
+    the program
+        we usually put redirects at the end, but they are allowed anywhere
+        
+    if there are duplicate redirects, only one will be used
+    
+pipes
+    idea: run two or more processes in a "pipeline"
+    
+    the output of each process becomes the input to the next process
+    
+        cat *.c | sort
+
+        cat some_text | sort | uniq -c
+        
+        grep ERROR program.log | sort | uniq -c > error_counts.txt
+    
+^C  interrupts every process in the foreground job
+            this usually just kills the processes
+            
+^Z  suspends the foreground job and returns to the shell
+
+
+    fg      resumes the most recently suspended job
+    bg      resumes a job, but in the background
+    
+    
+to run a job in the background from the start, put & at the end of the command
+
+    long_running_job > output.txt &
+    
+working with jobs and processes
+    jobs   - prints currently running (or suspended) jobs
+    ps     - prints currently running processes
+    
+        ps -e   - prints all running processes
+
+    top    - shows all running processes, along with measurements
+
+exit codes:
+    $?  - the exit code of the most recent job
+    
+    echo $?
+
+    more next week!

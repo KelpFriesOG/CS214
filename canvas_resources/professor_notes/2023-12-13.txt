@@ -1,0 +1,349 @@
+CS 214 / 2023-12-13
+===================
+
+Exam will become available at 8:00 AM, December 20, for 24 hours
+
+The exam itself will be on-line at Canvas, and will consist of two
+or three sections that may be taken independently. The total time
+required is expected to be 1-2 hours.
+
+If you have an exam conflict, e-mail me immediately
+    include "[CS214] Exam conflict" in the subject line
+    include your full exam schedule and conflicts
+
+
+C programming
+-------------
+
+essential syntax
+    variable declarations/initialization
+    control structures (if, while, for, switch)
+    function prototypes and definitions
+    
+basic types
+    integers: signed/unsigned char, signed/unsigned short/long/- int
+    	unsigned integer wrap on overflow
+    	signed integer overflow is undefined behavior
+    float, double
+    arrays
+    structs
+    	struct { int i; float f; } my_int_and_float;
+    unions
+    	union { int i; float f; } my_int_or_float;
+    enums  - fancy integers
+    	enum { North, South, East, West } my_direction;
+    pointers
+    	the address of some object
+    	pointer type indicates the object's type
+    	NULL
+    	
+dereference operator *
+	int *p;  - declares p is a pointer to an integer
+		(note: the star here is part of the type, not a dereference)
+		
+	*p = 5;   // write to the location p points to
+	x = *p;   // read from the location p points to
+
+we can get pointers to many things using &
+    variables
+    fields within a struct, elements within an array
+
+    recall: foo->bar is the same as (*foo).bar
+
+C arrays are simply a sequence of array items (of the same type)
+    contiguous in memory
+    
+    -> no requirement that an array be a distinct object
+       
+difference between a variable (object) and the data stored in that variable
+
+    int a[20];    // refers to an array of 20 integers in memory
+    int *p = malloc(20 * sizeof(int));
+                // p indirectly refers to an array of 20 integers in memory
+
+    array indexing works the same with both
+    
+    a[0] = p[0];
+    int *q = a;
+    q = a + 5;      // "pointer decay" means array variables can be treated like
+                    // pointers in most circumstances
+
+    key differences:
+        array variables are automatically managed
+            -> exist on stack or in static memory
+        arrays created by malloc must be freed
+            -> exist on the heap
+            
+        a pointer variable can refer to either kind of array
+        we can assign to pointer variables
+            p = a;
+        array variables are immutable
+            a = p;   // not allowed
+        
+
+function pointers
+    recall: functions are made of code, which can be found in memory
+        that is, code has an address
+    
+    a function's name with no () gives us a pointer to that function
+    
+    e.g., we have:
+        
+        int compare(void *x, void *y);
+        
+        writing compare(p, q) says to call compare()
+        writing compare obtains the address of the function (no call)
+        
+    we can store function pointers in variables, or fields, or pass them
+        to other functions
+        
+        int (*comparison_function)(void *, void *);
+        
+            declares a function pointer variable named "comparison_function
+            
+        comparison_function = compare;  // sets pointer variable
+        comparison_function(p, q);      // calls function being pointed to
+            // "indirect function call"
+            
+    void qsort(void *, size_t, size_t, int (*)(void *, void *));
+        qsort() takes:
+            a pointer to an array
+            the length of the array
+            the element size (in bytes)
+            a pointer to a comparison function
+
+
+Memory model & management
+-------------------------
+
+In C, we talk about "objects"
+    a contiguous sequence of bytes with some interpretation
+    may consist of smaller objects
+
+objects in C have three different possible lifespans
+    static objects exist the entire time the program is running
+        - usually global variables, but also static local variables
+    stack objects are associated with the lifetime of a function
+    heap objects are created by malloc() and destroyed by free()
+    
+static and stack objects are associated with variables
+all objects may be referred to by pointers
+    not all pointers into the heap refer to objects that can be freed
+    
+    if I use malloc() to create an array or struct, I can only free the
+        entire thing
+
+it is incorrect to use a pointer after the object it refers to has been destroyed
+    don't use a pointer to a local variable after its function returns
+    don't use a pointer to a heap object after it has been freed
+    in general, there is no way to know you are doing this, so be careful!
+
+    "use after free"
+
+it is incorrect to free an object that has already been freed
+    "double free"
+
+it is even less correct to free an object not created by malloc!
+
+In the mymalloc project, we saw one way to organize the heap
+    divide the heap up into objects+headers
+    allocating space just means marking space in use (possibly after dividing
+        a large object into two smaller objects)
+    freeing space just means marking an object no longer in use
+        (possibly combining adjacent free objects)
+
+    how can free detect problems? in general, it cannot!
+
+
+Posix file IO
+-------------
+
+functions from the C standard
+    FILE pointers
+    fopen(), fclose(), fscanf(), fprintf(), etc.
+    "buffered IO"
+    more portable, easier to use
+    
+functions from the Posix standard
+    file descriptors
+    open(), close(), read(), write()
+    "unbuffered IO"
+    more control
+
+Posix uses "file descriptors" as an abstract interface for many concepts
+    many things that can be understood as a stream of bytes are treated as files
+    
+    - actual files on disk
+    - input streams from the console
+    - output streams to the console
+    - network/inter-process sockets
+    - pipes
+    - other devices (printers, sensors, etc.)
+
+    using the file abstraction lets us re-use code for all of these
+
+    some file types have additional features
+        send() and recv() with sockets
+        lseek() with disk files
+
+recall: pipe(), dup(), dup2()
+
+File system concepts
+--------------------
+
+Unix-like file systems have two ways to refer to a file
+    "inode number" - used internally, unique integer for each file
+    "path name" - supported by the user interface
+    
+Inode: fixed size block of metadata for a file
+    includes: file owner, permissions, 
+        locations of data blocks containing the file's contents
+            -> direct and single/double/triple indirect blocks
+            -> allows small inodes for small files, but still have very large files
+
+    does not include file name!
+
+file names / path names come from directories (folders)
+    a directory contains the name and inode number for each file it contains
+
+absolute path names tell us which directories to look through to find a file
+
+    /foo/bar/baz
+        start in /
+        look for foo
+        in that, look for bar
+        in that, look for baz
+        
+we can have multiple directory entries that refer to a single file (inode)
+    many paths can refer to the same file
+    "hard links"
+    every inode tracks how many names link to it
+        rm "unlinks" a name
+        when there are no names left, the file is deleted
+        
+we can also have "soft links" or "symbolic links"
+    these are files that connect a path name to another path name
+        "foo" is an alias for "bar"
+        deleting "bar" does not affect "foo" (it becomes a broken link)
+        creating a new file named "bar" means "foo" now refers to that
+
+Starting processes
+------------------
+
+process is a program that is running
+    program + state
+    - stack, heap, static memory
+    - open files
+    - other information
+
+In Posix, we use fork() to create processes
+    fork() duplicates the current process
+    both the original process (parent) and new process (child) will proceed
+        from the call to fork()
+        
+    aside from the return value of fork(), there is no way to distinguish them
+    
+    in the parent, fork() returns the PID of the child
+    in the child, fork() returns 0 (not a possible child PID)
+
+Child processes often call exec()
+    exec() changes the program of the current process
+    the new program almost starts from scratch
+        (most) files that were open before, remain open
+        we can use this to configure a program before it starts
+            (e.g., change stdin/stdout/stderr)
+
+The parent process must eventually call wait()
+    when a process ends, it becomes a "zombie"
+        some information is maintained in the process table (exit status)
+    wait() cleans up the entry and obtains the exit status
+    
+    wait() blocks if no child has become a zombie yet
+    
+    if you terminate without calling wait(), the child becomes an orphan
+    -> when the child terminates, it becomes an orphan zombie
+    
+    orphan processes will eventually be "adopted" by the OS and cleaned up
+    -> it's not a good idea to create orphans on purpose
+
+Signals
+-------
+
+a message sent to a process while running
+-> discrete set of signal kinds, indicated by number
+
+each process sets a "disposition" for each signal kind
+- ignore, halt, halt and dump core, stop, continue, call signal handler
+
+a signal handler is a function that is called when an appropriate signal arrives
+	- call is asynchronous
+	- normally added directly on to the stack, on top of the current function
+	- if handler returns, it resumes whatever was happening when the signal arrived
+	- handler can also call exit() or do a few other things
+	
+async-signal-safe functions
+
+signal mask
+	blocks delivery of certain signals
+	signals are not discarded: if the signal kind is later unblocked, they are delivered
+
+
+Multithreading and synchronization
+----------------------------------
+
+multitasking within a single process
+    shared program, static memory, heap
+    each thread has its own stack and instruction pointer
+
+advantage: shared memory between tasks
+    simple communication between threads
+    
+disadvantage: shared memory between tasks
+    potential interference, data races
+    threads may access data structures at the same time, resulting
+        in inconsistent states or confusion
+        
+to avoid problems with simultaneous access, we use synchronization
+
+mutual exclusion: mutex, lock
+    allows us to create resources that at most one thread has access to at 
+        a time
+    in general, you must assume that other threads are modifying any shared
+        data unless you have exclusive access
+        
+condition variables
+    lets us block a thread until some condition is satisfied
+        e.g., wait for data to become available
+
+
+semaphores
+    generalization of locks and condition variables
+    very flexible, more difficult to understand
+
+
+deadlock
+	1. mutual exclusion
+	2. hold and wait
+	3. no preemption
+	4. circular wait
+
+how can we avoid deadlock?
+	- be careful
+	one approach: have an ordering of locks
+		if we always obtain locks in a specific order, we cannot have circular wait
+		
+	alternatives
+		- don't have multiple locks 
+		- don't have multiple locks at once
+		
+	- lock-free algorithms
+		transactional memory
+	
+
+atomic: test-and-set
+
+	idea: set the value of a location in memory, only if it currently has an expected value
+		e.g., set x = 1, only if x = 0
+	
+	spinlock: repeatedly test-and-set until success
+		only one thread can succeed at a time

@@ -1,0 +1,38 @@
+CS 214 / 2023-09-29
+===================
+
+Arrays in C
+- size is fixed at creation time
+    -> array variables have sizes fixed at compile time
+    -> arrays on the heap may have sizes determined during run-time
+
+- no memory overhead (no storage of size, or explicit boundaries)
+- constant-time access to array elements via indexing
+
+arrays are limited if we need
+- ability to expand/contract the array
+    - by adding/removing elements from one end
+    - by inserting/removing elements in the middle of the array
+
+choice of data structure is determined by what operations you need
+-> array, linked list, tree, hashtable, etc.
+
+
+how can we create a data structure with efficient push/pop operations
+-> linked list
+    pointer to head node
+    update head for push/pop, create and free nodes as needed
+
+-> array list
+    keep track of length of list
+        increase/decrease length when we push/pop
+    store values in indices 0 .. length-1
+    if the array fills up, create a bigger array and copy everything over
+        -> if we always double the list, we can prove that insertion is
+            constant time (on average)
+
+    -> locality (elements are stored near each other in memory)
+    -> minimal overhead (pointer and two numbers)
+
+
+    

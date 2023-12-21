@@ -1,0 +1,107 @@
+CS 214 / 2023-10-20
+===================
+
+Tar archive
+-----------
+
+tar -vczf p1.tar <list of files or directories>
+
+
+$ tar -xf p1.tar
+$ make
+$ ./memgrind
+$ cat README
+
+
+tar -tf p1.tar
+    -- lists contents of Tar archive
+
+Permissions
+-----------
+
+three groups: owner (user), group, others
+three permissions: read, write, execute (x)
+
+chmod changes the permissions of a file
+
+Usage:
+    chmod [person][+-][permissions] [paths]
+    
+    chmod a+rw
+        gives read and write permission to user, group, and others
+        
+    chmod o-w
+        removes write permission for others
+
+    chmod [octal code] [file paths]
+    
+        u  g  o
+        rwxrwxrwx
+        
+    chmod 744 file
+        111100100
+
+
+Execute permission has two purposes
+    for normal files, it gives permission to execute the file
+        (file must have a known executable format)
+        
+    for directories, execute gives permission to list contents of
+        the directory
+
+In C, you can use chmod()
+
+
+Files
+-----
+
+
+int open(char *path, int flags);
+    returns a file descriptor on success
+    returns -1 on error & sets errno
+
+int open(char *path, int flags, mode_t mode);
+    required when using O_CREAT
+    returns:
+        file descriptor
+        -1 on error & sets errno
+
+int close(int fd);
+    returns:
+        0 for success
+        -1 on error & sets errno
+
+ssize_t read(int fd, void *buffer, size_t buffer_length);
+    returns: number of bytes read
+        0 for EOF
+        -1 on error & sets errno
+    
+ssize_t write(int fd, void *buffer, size_t buffer_length);
+    returns: number of bytes written
+        -1 on error & sets errno
+
+
+off_t lseek(int fd, off_t offset, int whence);
+    whence is one of
+        SEEK_SET (offset from start)
+        SEEK_CUR (offset from current location)
+        SEEK_END (offset from end)
+
+
+Open files
+----------
+
+Each process has a table of open files
+    file descriptors are essentially indicies
+    
+    each file record says what the file is
+        (e.g. file on disk, input stream, output stream, network stream)
+    it tracks the current position
+    
+when a process ends, all its open files are closed
+
+the OS also keeps a table of open files
+    - open files can be shared across processes (e.g., stdin, stdout)
+
+
+        

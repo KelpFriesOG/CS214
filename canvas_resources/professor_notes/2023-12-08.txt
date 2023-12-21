@@ -1,0 +1,261 @@
+CS 214 / 2023-12-08
+===================
+
+Final exam: December 20, 8:00 AM
+
+Memory consistency
+------------------
+
+James Bornholt, Memory Consistency Models: A Tutorial
+https://www.cs.utexas.edu/~bornholt/post/memory-models.html
+
+memory consistency
+race conditions
+    - nondeterministic behavior in multithreading
+    - multiple possible outcomes determined by thread speed
+data races
+    - occurs when two or more threads have unsynchronized
+        access to a memory location, with at least one write
+
+
+
+race condition example:
+    global variable A = 0
+    
+    thread 1            thread 2
+    --------            --------
+    A = 1               A = 2
+
+    after joining both threads, we read A
+    what do we get?
+        1 or 2
+        determined by which thread gets scheduled first
+    
+most memory models will enforce some store consistency:
+    writes happen in some order
+
+sequential consistency:
+    all reads and writes occur in some order
+
+scenario:
+    four global variables A = B = X = Y = 0
+
+
+    thread 1            thread 2
+    --------            --------
+    A = 1               B = 1
+    X = B               Y = A
+    
+after both threads execute and we join them, what
+are the values of X and Y?
+    X = 0, Y = 1
+    X = 1, Y = 0
+    X = 1, Y = 1
+    
+under sequential consistency, we cannot have
+    X = 0, Y = 0
+    this would require both reads to occur before both writes
+    time loop!
+    
+problem: sequential consistency is too slow
+    we would need to wait for all writes to propagate to all CPU
+        caches before we could continue
+
+    for efficiency, architectures allow CPUs to have briefly
+    inconsistent views of memory
+        a write happens instantly on its own CPU, but takes
+        time to propagate to main memory/other CPU caches
+    
+Intel CPUs use Total Store Ordering (TSO)
+    consistent ordering of writes
+    writes may not be immediately visible to other CPUs
+    
+
+solution: don't have a data race
+
+if we insert a memory fence/barrier between the store and load,
+we eliminate this scenario
+
+a memory fence is a special instruction that delays the CPU
+until all pending writes have completed
+-> essentially, we enforce sequential consistency
+
+memory fences allow us to enforce sequential consistency when
+we need it, without needing to have it all the time
+
+atomic operations such as test-and-set use similar mechanisms
+to enforce sequential consistency
+
+
+using fences directly is not recommended
+    using too many will slow your code
+    not using enough results in data races
+    
+instead, use multithreading libraries
+    -> these will put the fences in the correct places
+
+
+Deadlock
+--------
+
+a deadlocked program is stuck and unable to continue
+
+    some mutex M
+    
+    lock(M)
+    lock(M)    <- blocks forever
+        a checked mutex might detect this, but a fast mutex
+        would not have enough information to detect the deadlock
+        
+there are four conditions for deadlock
+- mutually exclusive access to resources
+- no preemption (only the thread with access can release it)
+- hold and wait (while holding one resource, you can wait for another)
+- circular wait (A waits for B, B waits for C, C waits for A)
+
+
+
+example:
+    typedef struct {
+        mutex L;
+        int value;
+    } account_t;
+    
+    void transfer(account_t *dst, account_t *src, int amount) {
+        lock(&src->L);
+        if (src->value >= amount) {
+            lock(&dst->L);
+            dst.value += amount;
+            src.value -= amount;
+            unlock(&dst->L);
+        }
+        unlock(&src->L);
+    }
+    
+    
+    thread 1            thread 2
+    --------            --------
+    transfer(A, B, X)   transfer(B, A, Y)
+    lock(A->L)          lock(B->L)
+    lock(B->L)          lock(A->L)
+    
+    each thread is blocked, waiting for the other
+    
+
+once our program is in deadlock, it is too late
+
+we can try to avoid deadlock with a few strategies
+- don't hold multiple resources at the same time
+
+- ensure an ordering when acquiring multiple resources
+    e.g., always get the lock for the lower-numbered account first
+    having a consistent acquisition order prevents circular wait
+
+- atomic lock acquisition: get all locks simultaneously
+    requires library support
+
+
+in general, be careful whenever you acquire more than one lock at
+    a time
+
+    
+
+Semaphores
+----------
+
+the oldest synchronization primitive
+    both mutex and condition variables can be made with semaphores
+
+a semaphore is an integer with two operations
+    - post/increment
+        increases value of the semaphore by 1
+    - wait/decrement
+        decreases value of the semaphore by 1, unless it is 0
+        when semaphore is 0, block until semaphore > 0
+
+
+
+a mutex is (like) a semaphore that is initially 1
+
+    lock corresponds to wait
+    unlock corresponds to post
+    
+difference:
+    only the thread that locked the mutex can unlock it
+    any thread can post to a semaphore
+
+
+we can also use semaphores to block until conditions are met
+
+consider the bounded queue:
+    we have two resources:
+        available data
+        available space
+        
+#include "semaphore.h"
+
+sem_t
+
+sem_wait(sem_t *s)
+sem_post(sem_t *s)
+
+typedef struct {
+    data_t *array;
+    sem_t space;
+    sem_t data;
+    sem_t lock;
+    int head;
+    int tail;
+} queue_t;
+
+void init(queue_t *Q)
+{
+    Q->array = malloc(length * sizeof(data_t));
+    sem_init(&Q->lock, 0, 1);
+    sem_init(&Q->data, 0, 0);
+    sem_init(&Q->space, 0, length);
+    Q->head = 0;
+    Q->tail = 0;
+}
+
+
+void enqueue(queue_t *Q, data_t D)
+{
+    sem_wait(&Q->space);
+    
+    sem_wait(&Q->lock);
+        Q->array[Q->tail] = D;
+        Q->tail++;
+        if (Q->tail > length) Q->tail = 0;
+    sem_post(&Q->lock);
+    
+    sem_post(&Q->data);
+}
+
+void dequeue(queue_t *Q, data_t *P)
+{
+    sem_wait(&Q->data);
+    
+    sem_wait(&Q->lock);
+        *P = Q->array[Q->head];
+        Q->head++;
+        if (Q->head > length) Q->head = 0;
+    sem_post(&Q->lock);
+    
+    sem_post(&Q->space);
+}
+
+
+differences between semaphores and mutex/condition variables in POSIX
+
+- semaphores are safe to use in signal handlers
+- in addition to process-local semaphores, we can have cross-process
+    semaphores (sem_open)
+    
+general differences
+any thread can post to a semaphore
+    we have no concept of "holding" a semaphore
+    
+
+
+

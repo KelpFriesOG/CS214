@@ -1,0 +1,109 @@
+CS 214 / 2023-10-25
+===================
+
+read() returns up to the requested number of bytes
+may return fewer bytes if
+- the number of bytes in the input stream is less than the requested amount
+- some data is available, but not enough to fill the buffer
+    - e.g., reading from a pipe, or stdin, or a network connection
+    
+read() will block if no data is currently available, but the stream is
+still active (not closed)
+
+-> read() only returns 0 when the input stream is closed
+
+
+exception: we can create "non-blocking" input streams
+-> these can't block when no data is available, but they also can't return 0
+-> they return -1 and set errno to EAGAIN or EWOULDBLOCK
+
+
+
+File system
+-----------
+
+Unix File System (UFS) and UFS-line file systems
+
+two relevant kinds of blocks on the disk
+- data blocks (store the contents of files)
+- inode blocks (store metadata about a file)
+
+
+Every file on disk is associated with a unique inode
+inodes are referred to by index number/serial number
+    knowing the index number of a file lets us find its inode quickly
+    (really, device number + inode number identifies a file)
+
+inode contains:
+- the user and group that owns the file
+- mode (permissions)
+- creation/modification/access timestamps
+- length of the file in bytes
+- number of "hard links"
+- several block pointers (saying which data blocks the file uses)
+
+data block size varies by file system
+    commonly 1-8 KB
+    data blocks are referred to by "block pointers"
+
+problem:
+    - all inodes are the same size
+    - we want fast access to any block in the file
+    - we want to allow for large files
+    - we don't want to waste space for small files
+    
+solution: use different levels of indirection
+- 12 direct pointers
+    -> indicates which data blocks contain the data for the file
+- one indirect pointer
+    -> points to a data block containing more pointers
+- one double-indirect pointer
+    -> points to a data block containing single-indirect pointers
+- one triple-indirect pointer
+
+
+
+every absolute path identifies (at most) one inode
+
+directories contain a mapping of names to inodes
+-> absolute path for a file is the absolute path of its directory
+    plus its name
+    
+the linking of a name to an inode is called a "hard link"
+
+in unix, multiple names can link to the same file (inode)
+    -> this is why inodes contain the number of hard links
+    -> when the count drops to 0, the file can be deleted
+
+most files have one hard link
+    ls -l will include the number of hard links
+    
+directories have 2 or more hard links
+    1 from its parent directory
+    1 from itself (.)
+    1 from each of its subdirectories (via ..)
+
+
+The program ln creates a new hard link for an existing file
+
+    ln <existing file> <additional name>
+    
+    ln foo bar
+        creates bar, which links to the same file as foo
+        
+        
+
+$ echo hello > foo
+    creates foo
+$ ln foo bar
+    creates bar, referring to the same file as foo
+$ rm foo
+    unlinks foo, but bar still exists
+
+mv unlinks a the source file name and relinks it at the destination
+
+-> the inode remains unchanged
+-> moving a file while another program is using is fine!
+    
+    
+
